@@ -35,7 +35,7 @@ export function Header() {
       <nav className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <Link href="/" aria-label="Flare Registry" className="flex items-center">
           <Image
-            src={theme === "dark" ? "/logo-wordmark-dark.png" : "/logo-wordmark.png"}
+            src={theme === "dark" ? "/logo-wordmark-dark.v2.png" : "/logo-wordmark.v2.png"}
             alt="Flare Registry"
             width={928}
             height={200}

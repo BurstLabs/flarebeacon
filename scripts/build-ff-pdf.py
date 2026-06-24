@@ -5,7 +5,7 @@ import re, html, subprocess, os, base64
 
 SRC = "docs/flare-registry-vs-legacy-for-flare-foundation.md"
 OUT = "docs/flare-registry-vs-legacy-for-flare-foundation.pdf"
-LOGO = "public/logo-wordmark.png"  # the Flare Registry logo, embedded as a header (light variant, on white)
+LOGO = "public/logo-wordmark.v2.png"  # the Flare Registry logo, embedded as a header (light variant, on white)
 
 md = open(SRC).read()
 

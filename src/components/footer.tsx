@@ -11,7 +11,7 @@ export function Footer() {
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-sm">
           <Image
-            src={theme === "dark" ? "/logo-wordmark-dark.png" : "/logo-wordmark.png"}
+            src={theme === "dark" ? "/logo-wordmark-dark.v2.png" : "/logo-wordmark.v2.png"}
             alt="Flare Registry"
             width={928}
             height={200}
