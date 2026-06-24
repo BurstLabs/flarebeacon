@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CHAINS } from "@/lib/chains";
 import { useApp } from "./providers";
 
@@ -26,9 +27,10 @@ export function LinkNetworkPanel({
 }: {
   providerName: string;
   excludeChainId?: number;
-  addresses?: { chainId: number; chain: string; address: string }[];
+  addresses?: { chainId: number; chain: string; address: string; verified: boolean }[];
 }) {
   const { t } = useApp();
+  const router = useRouter();
   const options = CHAINS.filter((c) => c.chainId !== excludeChainId);
   const [linkChainId, setLinkChainId] = useState<number>(options[0]?.chainId ?? 19);
   const [busy, setBusy] = useState(false);
@@ -60,7 +62,11 @@ export function LinkNetworkPanel({
     }
   }
 
-  async function linkNetwork() {
+  // Core flow: connect the wallet, prove ownership of the listing by signing in, then sign a
+  // challenge for `chainId` and submit it. The link endpoint upserts the address as verified, so
+  // this both LINKS a new network and VERIFIES an existing unverified row. `expectAddress`, when
+  // given (the "Verify" action on a specific row), requires the connected wallet to be that address.
+  async function proveAddress(chainId: number, expectAddress?: string) {
     setErr("");
     setMsg("");
     setBusy(true);
@@ -69,24 +75,24 @@ export function LinkNetworkPanel({
       const accounts = (await window.ethereum.request({
         method: "eth_requestAccounts",
       })) as string[];
-      const linkAddr = accounts?.[0];
-      if (!linkAddr) throw new Error(t("submit.err.noAccount"));
+      const addr = accounts?.[0];
+      if (!addr) throw new Error(t("submit.err.noAccount"));
+      if (expectAddress && addr.toLowerCase() !== expectAddress.toLowerCase()) {
+        throw new Error(t("submit.err.wrongAccount", { address: expectAddress }));
+      }
 
-      // First prove an address that already owns this listing (opens a session), then prove the
-      // new address. The connected wallet is used for both; the user is prompted to switch
-      // accounts for the second signature if the new address differs.
-      await signIn(linkAddr);
+      await signIn(addr);
 
       const nonceRes = await fetch("/api/auth/nonce", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address: linkAddr, chainId: linkChainId }),
+        body: JSON.stringify({ address: addr, chainId }),
       });
       if (!nonceRes.ok) throw new Error(t("submit.err.noChallenge"));
       const { message } = await nonceRes.json();
       const signature = (await window.ethereum.request({
         method: "personal_sign",
-        params: [message, linkAddr],
+        params: [message, addr],
       })) as string;
 
       const res = await fetch("/api/provider/link", {
@@ -101,8 +107,13 @@ export function LinkNetworkPanel({
         );
       }
       const chainName =
-        CHAINS.find((c) => c.chainId === linkChainId)?.name ?? t("submit.fallback.network");
-      setMsg(t("submit.link.ok", { network: chainName }));
+        CHAINS.find((c) => c.chainId === chainId)?.name ?? t("submit.fallback.network");
+      setMsg(
+        expectAddress
+          ? t("submit.verify.ok", { network: chainName })
+          : t("submit.link.ok", { network: chainName })
+      );
+      router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("submit.err.linkFailed"));
     } finally {
@@ -137,6 +148,7 @@ export function LinkNetworkPanel({
         );
       }
       setMsg(t("submit.unlink.ok"));
+      router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("submit.err.unlinkFailed"));
     } finally {
@@ -165,7 +177,7 @@ export function LinkNetworkPanel({
         </label>
         <button
           type="button"
-          onClick={linkNetwork}
+          onClick={() => proveAddress(linkChainId)}
           disabled={busy}
           className="rounded-lg border border-beacon px-4 py-2 text-sm font-medium text-beacon transition hover:bg-beacon/10 disabled:opacity-50"
         >
@@ -185,16 +197,28 @@ export function LinkNetworkPanel({
                   <span className="text-faint">{a.chain}</span>{" "}
                   <span className="font-mono text-xs">{a.address}</span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => removeAddress(a.chainId, a.address)}
-                  disabled={removing === `${a.chainId}-${a.address}`}
-                  className="shrink-0 text-xs text-flare underline-offset-2 hover:underline disabled:opacity-50"
-                >
-                  {removing === `${a.chainId}-${a.address}`
-                    ? t("submit.unlink.removing")
-                    : t("submit.unlink.button")}
-                </button>
+                <span className="flex shrink-0 items-center gap-3">
+                  {!a.verified && (
+                    <button
+                      type="button"
+                      onClick={() => proveAddress(a.chainId, a.address)}
+                      disabled={busy}
+                      className="text-xs text-beacon underline-offset-2 hover:underline disabled:opacity-50"
+                    >
+                      {t("submit.verify.button")}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeAddress(a.chainId, a.address)}
+                    disabled={removing === `${a.chainId}-${a.address}`}
+                    className="text-xs text-flare underline-offset-2 hover:underline disabled:opacity-50"
+                  >
+                    {removing === `${a.chainId}-${a.address}`
+                      ? t("submit.unlink.removing")
+                      : t("submit.unlink.button")}
+                  </button>
+                </span>
               </li>
             ))}
           </ul>
