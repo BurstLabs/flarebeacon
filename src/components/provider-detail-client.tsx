@@ -153,6 +153,12 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
         {d.url}
       </a>
 
+      <div className="mt-3">
+        <Link href="/submit" className="text-sm text-muted underline-offset-2 hover:text-beacon hover:underline">
+          {t("detail.manageListing")} &rarr;
+        </Link>
+      </div>
+
       {/* Management Group flag action (new providers only, when not already under review). */}
       {d.flaggable && !d.governance?.underReview && <FlagAction providerId={d.providerId} />}
 

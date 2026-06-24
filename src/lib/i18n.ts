@@ -19,7 +19,7 @@ type Dict = Record<string, string>;
 const en: Dict = {
   // Header / nav
   "nav.directory": "Directory",
-  "nav.list": "List your provider",
+  "nav.list": "Manage your listing",
   "nav.feed": "Feed",
   "nav.api": "API",
   "nav.why": "Why us",
@@ -93,7 +93,7 @@ const en: Dict = {
   // Footer
   "footer.tagline": "Self-service FTSO signal provider registry for Flare and Songbird.",
   "footer.directory": "Directory",
-  "footer.list": "List your provider",
+  "footer.list": "Manage your listing",
   "footer.feed": "Feed",
   "footer.api": "API",
   "footer.rights": "All rights reserved.",
@@ -121,6 +121,7 @@ const en: Dict = {
   "detail.delegatorReward": "Delegator reward",
   "detail.epochsRange": "Epochs {from} to {to}.",
   "detail.addresses": "Addresses",
+  "detail.manageListing": "Manage this listing",
   "detail.registeredAddresses": "Registered on-chain addresses",
   "detail.registeredAddressesNote": "The five role addresses this entity registered on-chain (identity, submit, submit signatures, signing policy, delegation).",
   "detail.selfDeclaredNote": "Provider-attested; not verified on-chain.",
@@ -352,7 +353,7 @@ const en: Dict = {
 
 const es: Dict = {
   "nav.directory": "Directorio",
-  "nav.list": "Publica tu proveedor",
+  "nav.list": "Gestiona tu ficha",
   "nav.feed": "Feed",
   "nav.api": "API",
   "nav.why": "Por qué nosotros",
@@ -423,7 +424,7 @@ const es: Dict = {
   "footer.tagline":
     "Registro autogestionado de proveedores de señales FTSO para Flare y Songbird.",
   "footer.directory": "Directorio",
-  "footer.list": "Publica tu proveedor",
+  "footer.list": "Gestiona tu ficha",
   "footer.feed": "Feed",
   "footer.api": "API",
   "footer.rights": "Todos los derechos reservados.",
@@ -450,6 +451,7 @@ const es: Dict = {
   "detail.delegatorReward": "Recompensa del delegador",
   "detail.epochsRange": "Épocas {from} a {to}.",
   "detail.addresses": "Direcciones",
+  "detail.manageListing": "Gestionar esta ficha",
   "detail.registeredAddresses": "Direcciones registradas on-chain",
   "detail.registeredAddressesNote": "Las cinco direcciones de rol que esta entidad registró on-chain (identidad, envío, firmas de envío, política de firma, delegación).",
   "detail.selfDeclaredNote": "Declarado por el proveedor; no verificado on-chain.",
@@ -680,7 +682,7 @@ const es: Dict = {
 
 const zh: Dict = {
   "nav.directory": "目录",
-  "nav.list": "登记您的提供商",
+  "nav.list": "管理您的条目",
   "nav.feed": "数据源",
   "nav.api": "API",
   "nav.why": "为何选择我们",
@@ -750,7 +752,7 @@ const zh: Dict = {
   "card.algoOpenSource": "开源算法",
   "footer.tagline": "面向 Flare 和 Songbird 的自助式 FTSO 信号提供商登记处。",
   "footer.directory": "目录",
-  "footer.list": "登记您的提供商",
+  "footer.list": "管理您的条目",
   "footer.feed": "数据源",
   "footer.api": "API",
   "footer.rights": "保留所有权利。",
@@ -777,6 +779,7 @@ const zh: Dict = {
   "detail.delegatorReward": "委托人奖励",
   "detail.epochsRange": "第 {from} 至 {to} 期。",
   "detail.addresses": "地址",
+  "detail.manageListing": "管理此条目",
   "detail.registeredAddresses": "链上注册地址",
   "detail.registeredAddressesNote": "该实体在链上注册的五个角色地址（身份、提交、提交签名、签名策略、委托）。",
   "detail.selfDeclaredNote": "提供商自述；未经链上验证。",
@@ -1007,7 +1010,7 @@ const zh: Dict = {
 
 const ja: Dict = {
   "nav.directory": "ディレクトリ",
-  "nav.list": "プロバイダーを登録",
+  "nav.list": "掲載を管理",
   "nav.feed": "フィード",
   "nav.api": "API",
   "nav.why": "選ばれる理由",
@@ -1078,7 +1081,7 @@ const ja: Dict = {
   "footer.tagline":
     "Flare および Songbird 向けのセルフサービス FTSO シグナルプロバイダー登録簿。",
   "footer.directory": "ディレクトリ",
-  "footer.list": "プロバイダーを登録",
+  "footer.list": "掲載を管理",
   "footer.feed": "フィード",
   "footer.api": "API",
   "footer.rights": "無断転載を禁じます。",
@@ -1105,6 +1108,7 @@ const ja: Dict = {
   "detail.delegatorReward": "委任者報酬",
   "detail.epochsRange": "第 {from}〜{to} 期。",
   "detail.addresses": "アドレス",
+  "detail.manageListing": "この掲載を管理",
   "detail.registeredAddresses": "オンチェーン登録アドレス",
   "detail.registeredAddressesNote": "このエンティティがオンチェーンで登録した5つのロールアドレス（アイデンティティ、サブミット、サブミット署名、署名ポリシー、委任）。",
   "detail.selfDeclaredNote": "プロバイダーの自己申告。オンチェーンでは未検証。",
@@ -1335,7 +1339,7 @@ const ja: Dict = {
 
 const ko: Dict = {
   "nav.directory": "디렉터리",
-  "nav.list": "프로바이더 등록",
+  "nav.list": "리스팅 관리",
   "nav.feed": "피드",
   "nav.api": "API",
   "nav.why": "선택 이유",
@@ -1405,7 +1409,7 @@ const ko: Dict = {
   "card.algoOpenSource": "오픈소스 알고리즘",
   "footer.tagline": "Flare 및 Songbird를 위한 셀프 서비스 FTSO 시그널 프로바이더 레지스트리.",
   "footer.directory": "디렉터리",
-  "footer.list": "프로바이더 등록",
+  "footer.list": "리스팅 관리",
   "footer.feed": "피드",
   "footer.api": "API",
   "footer.rights": "모든 권리 보유.",
@@ -1432,6 +1436,7 @@ const ko: Dict = {
   "detail.delegatorReward": "위임자 보상",
   "detail.epochsRange": "{from}~{to} 에포크.",
   "detail.addresses": "주소",
+  "detail.manageListing": "이 리스팅 관리",
   "detail.registeredAddresses": "온체인 등록 주소",
   "detail.registeredAddressesNote": "이 엔터티가 온체인에 등록한 다섯 가지 역할 주소(아이덴티티, 제출, 제출 서명, 서명 정책, 위임).",
   "detail.selfDeclaredNote": "프로바이더 자가 신고; 온체인 미검증.",
@@ -1662,7 +1667,7 @@ const ko: Dict = {
 
 const de: Dict = {
   "nav.directory": "Verzeichnis",
-  "nav.list": "Anbieter eintragen",
+  "nav.list": "Eintrag verwalten",
   "nav.feed": "Feed",
   "nav.api": "API",
   "nav.why": "Warum wir",
@@ -1733,7 +1738,7 @@ const de: Dict = {
   "footer.tagline":
     "Self-Service-FTSO-Signalanbieter-Verzeichnis für Flare und Songbird.",
   "footer.directory": "Verzeichnis",
-  "footer.list": "Anbieter eintragen",
+  "footer.list": "Eintrag verwalten",
   "footer.feed": "Feed",
   "footer.api": "API",
   "footer.rights": "Alle Rechte vorbehalten.",
@@ -1760,6 +1765,7 @@ const de: Dict = {
   "detail.delegatorReward": "Delegator-Belohnung",
   "detail.epochsRange": "Epochen {from} bis {to}.",
   "detail.addresses": "Adressen",
+  "detail.manageListing": "Diesen Eintrag verwalten",
   "detail.registeredAddresses": "Registrierte On-Chain-Adressen",
   "detail.registeredAddressesNote": "Die fünf Rollenadressen, die diese Entität on-chain registriert hat (Identität, Submit, Submit-Signaturen, Signing-Policy, Delegation).",
   "detail.selfDeclaredNote": "Vom Anbieter angegeben; nicht on-chain verifiziert.",
@@ -1991,7 +1997,7 @@ const de: Dict = {
 const fr: Dict = {
   // Header / nav
   "nav.directory": "Répertoire",
-  "nav.list": "Inscrire votre fournisseur",
+  "nav.list": "Gérer votre fiche",
   "nav.feed": "Flux",
   "nav.api": "API",
   "nav.why": "Pourquoi nous",
@@ -2064,7 +2070,7 @@ const fr: Dict = {
   // Footer
   "footer.tagline": "Registre en libre-service des fournisseurs de signaux FTSO pour Flare et Songbird.",
   "footer.directory": "Répertoire",
-  "footer.list": "Inscrire votre fournisseur",
+  "footer.list": "Gérer votre fiche",
   "footer.feed": "Flux",
   "footer.api": "API",
   "footer.rights": "Tous droits réservés.",
@@ -2092,6 +2098,7 @@ const fr: Dict = {
   "detail.delegatorReward": "Récompense du délégateur",
   "detail.epochsRange": "Époques {from} à {to}.",
   "detail.addresses": "Adresses",
+  "detail.manageListing": "Gérer cette fiche",
   "detail.registeredAddresses": "Adresses on-chain enregistrées",
   "detail.registeredAddressesNote": "Les cinq adresses de rôle que cette entité a enregistrées on-chain (identité, soumission, soumission de signatures, politique de signature, délégation).",
   "detail.selfDeclaredNote": "Attesté par le fournisseur ; non vérifié on-chain.",
