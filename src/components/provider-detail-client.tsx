@@ -26,7 +26,7 @@ export interface DetailData {
   privateNode: boolean;
   algorithm: string | null;
   checks: { key: string; label: string; status: "pass" | "fail" | "unknown"; detail: string }[];
-  addresses: { chain: string; address: string; verified: boolean }[];
+  addresses: { chain: string; address: string; verified: boolean; testnet: boolean }[];
   // The full registered on-chain entity addresses (all five roles) per matched network.
   entityAddresses: { network: string; roles: { role: string; address: string }[] }[];
   history: {
@@ -276,6 +276,11 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
             <li key={`${a.chain}-${a.address}`} className="flex items-center justify-between gap-3 px-4 py-3">
               <div className="min-w-0">
                 <span className="text-faint">{a.chain}</span>
+                {a.testnet && (
+                  <span className="ml-2 rounded bg-elev px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted">
+                    {t("detail.testnet")}
+                  </span>
+                )}
                 <div className="truncate font-mono text-xs">{a.address}</div>
               </div>
               {a.verified && (

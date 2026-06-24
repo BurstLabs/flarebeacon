@@ -109,6 +109,7 @@ export default async function ProviderDetail({
       chain: getChain(a.chainId)?.name ?? `chain ${a.chainId}`,
       address: a.address,
       verified: a.verified,
+      testnet: getChain(a.chainId)?.mainnet === false,
     })),
     entityAddresses,
     history: historyRows.map((r) => ({
