@@ -13,6 +13,43 @@ declare global {
   }
 }
 
+// Switch MetaMask's active network to `chainId` so the signature popup shows the matching chain
+// (cosmetic - personal_sign is chain-independent). Adds the chain to the wallet if it's unknown.
+// Best-effort: if the user declines the switch we still proceed, since the signature is valid anyway.
+async function switchChain(chainId: number) {
+  const chain = CHAINS.find((c) => c.chainId === chainId);
+  if (!chain || !window.ethereum) return;
+  const hexId = `0x${chainId.toString(16)}`;
+  try {
+    await window.ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: hexId }],
+    });
+  } catch (e) {
+    // 4902 = chain not added to the wallet yet; add it, then it becomes active.
+    const code = (e as { code?: number })?.code;
+    if (code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [
+            {
+              chainId: hexId,
+              chainName: chain.name,
+              rpcUrls: [chain.rpcUrl],
+              nativeCurrency: chain.nativeCurrency,
+              blockExplorerUrls: [chain.explorerUrl],
+            },
+          ],
+        });
+      } catch {
+        /* user declined adding the chain; proceed - the signature is still valid */
+      }
+    }
+    /* user declined the switch; proceed anyway */
+  }
+}
+
 // Self-contained "Link another network" flow. Connects a wallet, signs the user in with the
 // connected address (proof of an address they already control on this listing), then takes a
 // second signature for the NEW address and links it. Used on /submit and on the provider page.
@@ -82,6 +119,9 @@ export function LinkNetworkPanel({
       if (expectAddress && addr.toLowerCase() !== expectAddress.toLowerCase()) {
         throw new Error(t("submit.err.wrongAccount", { address: expectAddress }));
       }
+
+      // Match the wallet's active network to the address's chain so the sign popup is consistent.
+      await switchChain(chainId);
 
       // Single signature, from the address being linked/verified. The server matches the listing
       // by name and requires it to already have a verified owner, so no separate sign-in is needed.
