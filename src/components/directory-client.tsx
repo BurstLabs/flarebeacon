@@ -194,12 +194,18 @@ export function DirectoryClient({
                       </span>
                     )}
                     {p.qualified && (
-                      <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-500 dark:text-emerald-300">
+                      <span
+                        title={t("badge.qualifiedHint")}
+                        className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-500 dark:text-emerald-300"
+                      >
                         {t("badge.qualified")}
                       </span>
                     )}
                     {p.registered && (
-                      <span className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400">
+                      <span
+                        title={t("badge.registeredHint")}
+                        className="rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-600 dark:text-emerald-400"
+                      >
                         {t("badge.registered")}
                       </span>
                     )}
