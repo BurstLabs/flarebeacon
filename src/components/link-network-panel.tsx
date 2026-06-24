@@ -80,6 +80,17 @@ export function LinkNetworkPanel({
       if (expectAddress && addr.toLowerCase() !== expectAddress.toLowerCase()) {
         throw new Error(t("submit.err.wrongAccount", { address: expectAddress }));
       }
+      // Linking a NEW network: the connected account must NOT already be on this listing. A common
+      // mistake is leaving the Flare account selected while trying to link Songbird - catch it
+      // before signing and tell the user to switch to the target network's account.
+      if (!expectAddress) {
+        const already = addresses.find((a) => a.address.toLowerCase() === addr.toLowerCase());
+        if (already) {
+          throw new Error(
+            t("submit.err.accountAlreadyLinked", { chain: already.chain, address: addr })
+          );
+        }
+      }
 
       await signIn(addr);
 
@@ -160,6 +171,7 @@ export function LinkNetworkPanel({
     <div className="rounded border border-themed bg-elev/50 p-4 text-sm">
       <p className="font-medium">{t("submit.link.title")}</p>
       <p className="mt-1 text-muted">{t("submit.link.body")}</p>
+      <p className="mt-2 text-xs text-faint">{t("submit.link.accountHint")}</p>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-xs text-muted">
           {t("submit.network")}
