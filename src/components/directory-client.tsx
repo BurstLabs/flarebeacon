@@ -204,8 +204,11 @@ export function DirectoryClient({
                       </span>
                     )}
                     {p.verified && (
-                      <span className="rounded-md bg-beacon/20 px-2 py-0.5 text-xs text-beacon">
-                        {t("badge.verified")}
+                      <span
+                        className="rounded-md bg-beacon/20 px-2 py-0.5 text-xs text-beacon"
+                        title={t("badge.ownerVerifiedTip")}
+                      >
+                        {t("badge.ownerVerified")}
                       </span>
                     )}
                   </div>
