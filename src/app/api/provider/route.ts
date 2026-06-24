@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   // have no on-chain reward data to check against, so they are exempt.
   for (const a of input.addresses) {
     const chain = getChain(a.chainId);
-    if (chain?.mainnet && !(await isRegisteredOnchain(a.address))) {
+    if (chain?.mainnet && !(await isRegisteredOnchain(a.address, chain.key))) {
       return NextResponse.json(
         {
           error: `address ${a.address} is not a registered FTSO entity on ${chain.name}. Only on-chain registered signal providers can list.`,

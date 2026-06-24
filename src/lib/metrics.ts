@@ -6,13 +6,20 @@ import { prisma } from "./db";
 
 /**
  * True if `address` is one of the registered on-chain FTSO entity addresses (any of the five
- * roles) on a mainnet network. Used to gate signup: only registered providers may list on
- * Flare/Songbird. Returns true regardless of network (caller decides which networks to enforce).
+ * roles). Used to gate signup: only registered providers may list on Flare/Songbird.
+ *
+ * Pass `network` to require the match be on THAT specific chain. This is important: an address
+ * registered on Flare must not pass the gate when being claimed as a Songbird listing (and vice
+ * versa). Omit `network` only when an any-network match is genuinely intended.
  */
-export async function isRegisteredOnchain(address: string): Promise<boolean> {
+export async function isRegisteredOnchain(
+  address: string,
+  network?: string
+): Promise<boolean> {
   const a = address.toLowerCase();
   const hit = await prisma.providerOnchain.findFirst({
     where: {
+      ...(network ? { network } : {}),
       OR: [
         { voter: a },
         { delegationAddress: a },

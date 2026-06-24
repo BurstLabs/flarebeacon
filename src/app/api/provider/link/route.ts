@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   if (!chainB) {
     return NextResponse.json({ error: "unsupported network" }, { status: 400 });
   }
-  if (chainB.mainnet && !(await isRegisteredOnchain(addressB))) {
+  if (chainB.mainnet && !(await isRegisteredOnchain(addressB, chainB.key))) {
     return NextResponse.json(
       {
         error: `address ${addressB} is not a registered FTSO entity on ${chainB.name}. Only on-chain registered signal providers can list.`,
