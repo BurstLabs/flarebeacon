@@ -77,23 +77,13 @@ export function LinkNetworkPanel({
       })) as string[];
       const addr = accounts?.[0];
       if (!addr) throw new Error(t("submit.err.noAccount"));
+      // For "Verify" on a specific row, the connected account must be that address.
       if (expectAddress && addr.toLowerCase() !== expectAddress.toLowerCase()) {
         throw new Error(t("submit.err.wrongAccount", { address: expectAddress }));
       }
-      // Linking a NEW network: the connected account must NOT already be on this listing. A common
-      // mistake is leaving the Flare account selected while trying to link Songbird - catch it
-      // before signing and tell the user to switch to the target network's account.
-      if (!expectAddress) {
-        const already = addresses.find((a) => a.address.toLowerCase() === addr.toLowerCase());
-        if (already) {
-          throw new Error(
-            t("submit.err.accountAlreadyLinked", { chain: already.chain, address: addr })
-          );
-        }
-      }
 
-      await signIn(addr);
-
+      // Single signature, from the address being linked/verified. The server matches the listing
+      // by name and requires it to already have a verified owner, so no separate sign-in is needed.
       const nonceRes = await fetch("/api/auth/nonce", {
         method: "POST",
         headers: { "content-type": "application/json" },

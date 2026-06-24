@@ -1,29 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSessionAddress } from "@/lib/session";
 import { verifyChallenge } from "@/lib/auth";
 import { isRegisteredOnchain } from "@/lib/metrics";
 import { getChain } from "@/lib/chains";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
 
-// POST /api/provider/link  -> attach a second network's address to the caller's existing listing.
+// POST /api/provider/link  -> attach a network address to an existing, already-claimed listing.
 //
-// Flare and Songbird addresses aren't linked on-chain. To merge them onto one listing we require
-// both signatures, so neither can be hijacked:
-//   - A: the current session (the wallet already on the listing).
-//   - B: a freshly signed challenge for the new address (in the body).
-// The name must match the existing listing (cosmetic check; the two signatures are the real gate).
-// B must pass the mainnet registration gate.
+// Flare and Songbird addresses aren't linked on-chain, and the two addresses are usually different
+// wallets, so the owner often only has the NEW address's key on hand. We therefore authorize with a
+// SINGLE signature from the new address (B), and gate it so a listing can't be hijacked:
+//   - B's signature proves control of the new address.
+//   - The target listing is matched BY NAME and must ALREADY have a verified owner (only a claimed
+//     listing can have networks added; the first claim happens via /submit).
+//   - For mainnet, B must be an on-chain registered FTSO entity on B's chain.
+//   - B must not already be a verified part of a DIFFERENT listing.
+// This also covers verifying an existing-but-unverified row (upsert flips it to verified).
 export async function POST(req: NextRequest) {
   const limited = rateLimit(req, "submit", 10, 60_000);
   if (limited) return limited;
-
-  // Address A: the existing, already-verified session.
-  const sessionA = await getSessionAddress();
-  if (!sessionA) {
-    return NextResponse.json({ error: "not authenticated" }, { status: 401 });
-  }
 
   const body = await req.json().catch(() => null);
   const message = typeof body?.message === "string" ? body.message : null;
@@ -40,7 +36,7 @@ export async function POST(req: NextRequest) {
   const verified = await verifyChallenge(message, signature);
   if (!verified.ok || !verified.address) {
     return NextResponse.json(
-      { error: verified.error ?? "could not verify the second address" },
+      { error: verified.error ?? "could not verify the address" },
       { status: 401 }
     );
   }
@@ -52,13 +48,6 @@ export async function POST(req: NextRequest) {
     chainIdB = new SiweMessage(message).chainId;
   } catch {
     return NextResponse.json({ error: "malformed message" }, { status: 400 });
-  }
-
-  if (addressB === sessionA) {
-    return NextResponse.json(
-      { error: "the second address is the same as the one you are signed in with" },
-      { status: 400 }
-    );
   }
 
   // Registration gate for B on mainnet networks.
@@ -75,25 +64,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Find the caller's existing listing (the provider holding the session address A).
-  const ownedA = await prisma.providerAddress.findFirst({
-    where: { address: sessionA },
-    select: { providerId: true, provider: { select: { name: true } } },
+  // Find the target listing by name, and require it to already be claimed (have a verified owner).
+  // Only a claimed listing can have networks added; the first claim is done via /submit.
+  const norm = (s: string) => s.trim().toLowerCase();
+  const candidates = await prisma.provider.findMany({
+    select: { id: true, name: true, addresses: { select: { verified: true } } },
   });
+  const ownedA = candidates.find((p) => norm(p.name) === norm(name));
   if (!ownedA) {
     return NextResponse.json(
-      { error: "you have no listing to link to; create one first" },
+      { error: `no listing named "${name}" exists. Create one first via List your provider.` },
       { status: 404 }
     );
   }
-
-  // Name-match confirmation: the entered name must equal the existing listing's name
-  // (case- and surrounding-space-insensitive).
-  const norm = (s: string) => s.trim().toLowerCase();
-  if (norm(name) !== norm(ownedA.provider.name)) {
+  if (!ownedA.addresses.some((a) => a.verified)) {
     return NextResponse.json(
       {
-        error: `the name does not match your existing listing ("${ownedA.provider.name}"). Linking is only for the same provider.`,
+        error: `the listing "${ownedA.name}" has no verified owner yet. Claim it first via List your provider.`,
       },
       { status: 409 }
     );
@@ -108,7 +95,7 @@ export async function POST(req: NextRequest) {
       provider: { select: { addresses: { select: { verified: true } } } },
     },
   });
-  if (existingB && existingB.providerId !== ownedA.providerId) {
+  if (existingB && existingB.providerId !== ownedA.id) {
     const otherIsClaimed = existingB.provider.addresses.some((a) => a.verified);
     if (otherIsClaimed) {
       return NextResponse.json(
@@ -122,14 +109,14 @@ export async function POST(req: NextRequest) {
     // Attach B (verified, listed) to the caller's provider. If B was an unclaimed import under a
     // different provider, move it over; clean up that now-empty imported provider.
     const orphanProviderId =
-      existingB && existingB.providerId !== ownedA.providerId
+      existingB && existingB.providerId !== ownedA.id
         ? existingB.providerId
         : null;
 
     await tx.providerAddress.upsert({
       where: { chainId_address: { chainId: chainIdB, address: addressB } },
       create: {
-        providerId: ownedA.providerId,
+        providerId: ownedA.id,
         chainId: chainIdB,
         address: addressB,
         verified: true,
@@ -137,7 +124,7 @@ export async function POST(req: NextRequest) {
         listed: true,
       },
       update: {
-        providerId: ownedA.providerId,
+        providerId: ownedA.id,
         verified: true,
         verifiedAt: new Date(),
         listed: true,
