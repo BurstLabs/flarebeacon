@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useApp } from "./providers";
 import { FlagAction } from "./governance-actions";
 import { LinkNetworkPanel } from "./link-network-panel";
+import { ManageListingButton } from "./manage-listing-button";
 
 export interface DetailData {
   name: string;
@@ -163,11 +164,7 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
         {d.url}
       </a>
 
-      <div className="mt-3">
-        <Link href="/submit?manage=1" className="text-sm text-muted underline-offset-2 hover:text-beacon hover:underline">
-          {t("detail.manageListing")} &rarr;
-        </Link>
-      </div>
+      <ManageListingButton />
 
       {/* Management Group flag action (new providers only, when not already under review). */}
       {d.flaggable && !d.governance?.underReview && <FlagAction providerId={d.providerId} />}

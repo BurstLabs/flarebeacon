@@ -133,6 +133,29 @@ function SubmitPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manage]);
 
+  // Arriving in manage mode (e.g. from the detail page's inline "Connect to manage", which already
+  // signed in) - skip the connect/sign step: read the session, load that listing, jump to the form.
+  useEffect(() => {
+    if (!manage || step !== "connect") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/session");
+        const { address: sessAddr } = await res.json();
+        if (cancelled || !sessAddr) return;
+        setAddress(sessAddr);
+        await loadExisting(sessAddr);
+        if (!cancelled) setStep("form");
+      } catch {
+        /* not signed in; the normal connect flow stays */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manage]);
+
   // Client pre-check for instant feedback; also avoids the CDN blocking an oversized POST before
   // our server can explain. Server re-validates. Keep in sync with lib/png.ts.
   async function checkLogo(file: File): Promise<string | null> {
