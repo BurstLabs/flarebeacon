@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CHAINS } from "@/lib/chains";
 import { checkContent } from "@/lib/content-filter";
@@ -113,6 +113,25 @@ function SubmitPageInner() {
   // Cross-network linking state (add a second network's address to this listing).
   const [logoMsg, setLogoMsg] = useState<string>("");
   const [logoOk, setLogoOk] = useState(false);
+
+  // Clicking "List your provider" in the nav (-> /submit, no manage param) means "start fresh".
+  // If we're sitting on a signed-in, prefilled listing, reset back to the empty connect step so
+  // the create flow isn't shown with someone's existing data and a contradictory title.
+  useEffect(() => {
+    if (!manage && existing) {
+      setStep("connect");
+      setAddress("");
+      setExisting(null);
+      setName("");
+      setDescription("");
+      setUrl("");
+      setPrivateNode(false);
+      setAlgorithm("");
+      setLogoUri("");
+      setError("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manage]);
 
   // Client pre-check for instant feedback; also avoids the CDN blocking an oversized POST before
   // our server can explain. Server re-validates. Keep in sync with lib/png.ts.
