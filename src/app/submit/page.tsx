@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CHAINS } from "@/lib/chains";
 import { checkContent } from "@/lib/content-filter";
 import { useApp } from "@/components/providers";
@@ -87,6 +88,7 @@ declare global {
 
 export default function SubmitPage() {
   const { t } = useApp();
+  const router = useRouter();
   const [step, setStep] = useState<Step>("connect");
   const [address, setAddress] = useState<string>("");
   const [chainId, setChainId] = useState<number>(14);
@@ -100,15 +102,9 @@ export default function SubmitPage() {
   const [busy, setBusy] = useState(false);
   // Set when the signed-in address already exists in the registry, so the form is a claim/edit.
   const [existing, setExisting] = useState<null | { source: string }>(null);
-  // True after a successful publish/update, to show the inline confirmation on the same page.
-  const [saved, setSaved] = useState(false);
   const [logoUri, setLogoUri] = useState<string>("");
   const [logoBusy, setLogoBusy] = useState(false);
   // Cross-network linking state (add a second network's address to this listing).
-  const [linkChainId, setLinkChainId] = useState<number>(19);
-  const [linkBusy, setLinkBusy] = useState(false);
-  const [linkMsg, setLinkMsg] = useState("");
-  const [linkErr, setLinkErr] = useState("");
   const [logoMsg, setLogoMsg] = useState<string>("");
   const [logoOk, setLogoOk] = useState(false);
 
@@ -257,61 +253,13 @@ export default function SubmitPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(explainError(body.error, t) ?? t("submit.err.saveFailed"));
       }
-      // Stay on the same page; show the inline saved confirmation. No separate "done" page.
-      setExisting({ source: "submitted" });
-      setSaved(true);
+      // On success, send the owner to their live listing, where they can manage it (edit, link
+      // another network, etc.). Linking is a management action and lives on the detail page.
+      router.push(`/provider/${address.toLowerCase()}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("submit.err.saveFailed"));
     } finally {
       setBusy(false);
-    }
-  }
-
-  // Link a second network's address to this listing. Requires signing with that network's wallet
-  // (proof of the new address); the current session is proof of the existing one. The two
-  // signatures are the security; the name match is a confirmation.
-  async function linkNetwork() {
-    setLinkErr("");
-    setLinkMsg("");
-    setLinkBusy(true);
-    try {
-      if (!window.ethereum) throw new Error(t("submit.err.noWalletShort"));
-      const accounts = (await window.ethereum.request({
-        method: "eth_requestAccounts",
-      })) as string[];
-      const linkAddr = accounts?.[0];
-      if (!linkAddr) throw new Error(t("submit.err.noAccount"));
-      if (linkAddr.toLowerCase() === address.toLowerCase())
-        throw new Error(t("submit.err.sameAddress"));
-
-      const nonceRes = await fetch("/api/auth/nonce", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address: linkAddr, chainId: linkChainId }),
-      });
-      if (!nonceRes.ok) throw new Error(t("submit.err.noChallenge"));
-      const { message } = await nonceRes.json();
-
-      const signature = (await window.ethereum.request({
-        method: "personal_sign",
-        params: [message, linkAddr],
-      })) as string;
-
-      const res = await fetch("/api/provider/link", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, signature, name }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(explainError(body.error, t) ?? t("submit.err.linkFailed"));
-      }
-      const chainName = CHAINS.find((c) => c.chainId === linkChainId)?.name ?? t("submit.fallback.network");
-      setLinkMsg(t("submit.link.ok", { network: chainName }));
-    } catch (e) {
-      setLinkErr(e instanceof Error ? e.message : t("submit.err.linkFailed"));
-    } finally {
-      setLinkBusy(false);
     }
   }
 
@@ -543,57 +491,6 @@ export default function SubmitPage() {
                   : t("submit.btn.update")
                 : t("submit.btn.publish")}
           </button>
-
-          {saved && (
-            <p className="text-sm text-beacon">
-              <Interp
-                text={t("submit.saved.lead", { feed: SENTINEL, directory: SENTINEL2 })}
-                node={
-                  <a className="underline" href="/api/feed/providerlist.json">
-                    {t("submit.saved.feed")}
-                  </a>
-                }
-                node2={
-                  <a className="underline" href="/">
-                    {t("submit.saved.directory")}
-                  </a>
-                }
-              />
-            </p>
-          )}
-
-          {(saved || existing) && (
-            <div className="mt-2 rounded border border-themed bg-elev/50 p-4 text-sm">
-              <p className="font-medium">{t("submit.link.title")}</p>
-              <p className="mt-1 text-muted">{t("submit.link.body")}</p>
-              <div className="mt-3 flex flex-wrap items-end gap-3">
-                <label className="text-xs text-muted">
-                  {t("submit.network")}
-                  <select
-                    value={linkChainId}
-                    onChange={(e) => setLinkChainId(Number(e.target.value))}
-                    className="mt-1 block rounded border border-themed bg-elev px-3 py-2 text-sm"
-                  >
-                    {CHAINS.filter((c) => c.chainId !== chainId).map((c) => (
-                      <option key={c.chainId} value={c.chainId}>
-                        {c.name} ({t("submit.chainIdLabel")} {c.chainId})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={linkNetwork}
-                  disabled={linkBusy}
-                  className="rounded-lg border border-beacon px-4 py-2 text-sm font-medium text-beacon transition hover:bg-beacon/10 disabled:opacity-50"
-                >
-                  {linkBusy ? t("submit.link.linking") : t("submit.link.button")}
-                </button>
-              </div>
-              {linkErr && <p className="mt-2 text-flare">{linkErr}</p>}
-              {linkMsg && <p className="mt-2 text-emerald-400">{linkMsg}</p>}
-            </div>
-          )}
         </div>
       )}
 
