@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useApp } from "./providers";
 import { FlagAction } from "./governance-actions";
+import { LinkNetworkPanel } from "./link-network-panel";
 
 export interface DetailData {
   name: string;
@@ -291,6 +292,15 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
             </li>
           ))}
         </ul>
+
+        <details className="group mt-3">
+          <summary className="cursor-pointer list-none text-sm text-muted underline-offset-2 hover:text-beacon hover:underline">
+            {t("submit.link.title")} &rarr;
+          </summary>
+          <div className="mt-3">
+            <LinkNetworkPanel providerName={d.name} />
+          </div>
+        </details>
       </section>
 
       {/* Full registered on-chain entity addresses (all five roles per network). */}
