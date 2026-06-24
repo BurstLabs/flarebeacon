@@ -271,7 +271,8 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
 
       {/* Addresses */}
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-semibold">{t("detail.addresses")}</h2>
+        <h2 className="mb-1 text-lg font-semibold">{t("detail.addresses")}</h2>
+        <p className="mb-3 text-xs text-faint">{t("detail.addressesNote")}</p>
         <ul className="surface divide-y divide-themed rounded-xl border text-sm">
           {d.addresses.map((a) => (
             <li key={`${a.chain}-${a.address}`} className="flex items-center justify-between gap-3 px-4 py-3">
