@@ -333,7 +333,7 @@ function SubmitPageInner() {
         </div>
       )}
 
-      {step === "connect" && (
+      {step === "connect" && !manage && (
         <details className="mb-6 rounded border border-themed bg-elev/50 p-4 text-sm">
           <summary className="cursor-pointer font-medium">
             {t("submit.qual.summary")}
