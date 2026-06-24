@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { useApp } from "./providers";
 import { LOCALES, LOCALE_NAMES } from "@/lib/i18n";
@@ -32,8 +33,15 @@ export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-themed bg-elev/80 backdrop-blur">
       <nav className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-        <Link href="/" aria-label="Flare Registry" className="text-lg font-semibold tracking-tight">
-          <span className="text-beacon">Flare</span> Registry
+        <Link href="/" aria-label="Flare Registry" className="flex items-center">
+          <Image
+            src={theme === "dark" ? "/logo-wordmark-dark.png" : "/logo-wordmark.png"}
+            alt="Flare Registry"
+            width={928}
+            height={200}
+            priority
+            className="h-8 w-auto"
+          />
         </Link>
 
         <div className="flex items-center gap-1 sm:gap-3">

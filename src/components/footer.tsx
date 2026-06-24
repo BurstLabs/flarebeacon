@@ -1,17 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useApp } from "./providers";
 
 export function Footer() {
-  const { t } = useApp();
+  const { t, theme } = useApp();
   return (
     <footer className="mt-16 border-t border-themed">
       <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-sm">
-          <div className="text-lg font-semibold tracking-tight">
-            <span className="text-beacon">Flare</span> Registry
-          </div>
+          <Image
+            src={theme === "dark" ? "/logo-wordmark-dark.png" : "/logo-wordmark.png"}
+            alt="Flare Registry"
+            width={928}
+            height={200}
+            className="h-9 w-auto"
+          />
           <p className="mt-2 text-sm text-muted">{t("footer.tagline")}</p>
         </div>
         <nav className="flex flex-col gap-2 text-sm">

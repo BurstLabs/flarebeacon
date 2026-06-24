@@ -5,7 +5,7 @@ import re, html, subprocess, os, base64
 
 SRC = "docs/flare-registry-vs-legacy-for-flare-foundation.md"
 OUT = "docs/flare-registry-vs-legacy-for-flare-foundation.pdf"
-LOGO = "public/logo.png"  # embedded as a branded header at the top of the document
+LOGO = "public/logo-wordmark.png"  # the Flare Registry logo, embedded as a header (light variant, on white)
 
 md = open(SRC).read()
 
@@ -112,14 +112,13 @@ strong{color:#111}
 .stat{flex:1;text-align:center}
 .num{font-size:28px;font-weight:800;color:#e07b1a;line-height:1}
 .lbl{font-size:10px;color:#666;margin-top:5px;line-height:1.3}
-.brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}
-.brand img{width:34px;height:34px}
-.brand .name{font-size:18px;font-weight:700;color:#1a1a1a}
-.brand .name b{color:#e07b1a}
+.brand{margin-bottom:20px}
+.brand img{height:34px;width:auto}
 """
 
-# Branded header: a text wordmark above the title.
-brand = '<div class="brand"><span class="name"><b>Flare</b> Registry</span></div>'
+# Branded header: the Flare Registry logo (base64-embedded) above the title.
+logo_b64 = base64.b64encode(open(LOGO, "rb").read()).decode()
+brand = f'<div class="brand"><img src="data:image/png;base64,{logo_b64}" alt="Flare Registry"></div>'
 
 open("/tmp/ff.html", "w").write(f'<html><head><meta charset="utf-8"><style>{css}</style></head><body>{brand}{body}</body></html>')
 assert open("/tmp/ff.html").read().count("**") == 0, "stray ** in output"

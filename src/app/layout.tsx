@@ -1,23 +1,46 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Providers } from "@/components/providers";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 
+const SITE_URL = "https://flareregistry.com";
+const TITLE = "Flare Registry — FTSO Signal Provider Directory";
+const DESCRIPTION =
+  "Self-service registry for Flare and Songbird FTSO signal providers. Prove your address by signature and manage your own listing.";
+
 export const metadata: Metadata = {
-  title: "Flare Registry — FTSO Signal Provider Directory",
-  description:
-    "Self-service registry for Flare and Songbird FTSO signal providers. Prove your address by signature and manage your own listing.",
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: DESCRIPTION,
+  manifest: "/site.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/favicon-16.png", type: "image/png", sizes: "16x16" },
       { url: "/favicon-32.png", type: "image/png", sizes: "32x32" },
       { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
     ],
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
   },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "Flare Registry",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [{ url: "/og-banner.png", width: 1200, height: 630, alt: "Flare Registry" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: ["/og-banner.png"],
+  },
 };
+
+export const viewport: Viewport = { themeColor: "#0C0F16" };
 
 // Applied before paint to avoid a flash of the wrong theme. Dark is the default.
 const noFlashTheme = `(function(){try{var t=localStorage.getItem('fb_theme')||'dark';var e=document.documentElement;e.classList.remove('light','dark');e.classList.add(t);var l=localStorage.getItem('fb_locale');if(l)e.lang=l;}catch(_){document.documentElement.classList.add('dark')}})();`;
