@@ -155,7 +155,7 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
       </a>
 
       <div className="mt-3">
-        <Link href="/submit" className="text-sm text-muted underline-offset-2 hover:text-beacon hover:underline">
+        <Link href="/submit?manage=1" className="text-sm text-muted underline-offset-2 hover:text-beacon hover:underline">
           {t("detail.manageListing")} &rarr;
         </Link>
       </div>

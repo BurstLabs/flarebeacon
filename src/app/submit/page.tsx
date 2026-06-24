@@ -89,6 +89,12 @@ declare global {
 export default function SubmitPage() {
   const { t } = useApp();
   const router = useRouter();
+  // "Manage" mode: arrived from a provider's "Manage this listing" link (/submit?manage=1). Shows
+  // edit-oriented copy and hides the new-listing "registration required" notice, since the visitor
+  // already has a listing. Plain /submit stays the "List your provider" create flow.
+  const [manage] = useState<boolean>(
+    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("manage")
+  );
   const [step, setStep] = useState<Step>("connect");
   const [address, setAddress] = useState<string>("");
   const [chainId, setChainId] = useState<number>(14);
@@ -265,10 +271,14 @@ export default function SubmitPage() {
 
   return (
     <div className="max-w-xl">
-      <h1 className="mb-2 text-2xl font-bold">{t("submit.title")}</h1>
-      <p className="mb-4 text-sm text-muted">{t("submit.intro")}</p>
+      <h1 className="mb-2 text-2xl font-bold">
+        {manage ? t("submit.manage.title") : t("submit.title")}
+      </h1>
+      <p className="mb-4 text-sm text-muted">
+        {manage ? t("submit.manage.intro") : t("submit.intro")}
+      </p>
 
-      {step === "connect" && (
+      {step === "connect" && !manage && (
         <div className="mb-6 rounded border border-beacon/40 bg-beacon/10 p-4 text-sm">
           <p className="font-medium text-beacon">{t("submit.reg.title")}</p>
           <p className="mt-1 text-muted">{t("submit.reg.body")}</p>

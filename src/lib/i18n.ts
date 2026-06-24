@@ -129,6 +129,8 @@ const en: Dict = {
   // Submit page
   "submit.title": "List your provider",
   "submit.intro": "Connect the wallet for your registered FTSO address, sign to prove you control it, then fill in your details. Your entry appears in the feed immediately.",
+  "submit.manage.title": "Manage your listing",
+  "submit.manage.intro": "Sign in with your provider address to edit your details, update your logo, or link another network. Changes appear in the feed immediately.",
   "submit.reg.title": "On-chain registration is required first",
   "submit.reg.body": "You must already be a registered FTSO signal provider on Flare or Songbird before you can list here. Flare Registry does not register you with Flare; it reads your existing on-chain registration. If your address is not yet registered as an FTSO entity, register on-chain first, then come back to list. (Coston and Coston2 test networks are exempt.)",
   "submit.qual.summary": "What does it take to be Qualified?",
@@ -460,6 +462,8 @@ const es: Dict = {
   // Submit page
   "submit.title": "Publica tu proveedor",
   "submit.intro": "Conecta la wallet de tu dirección FTSO registrada, firma para demostrar que la controlas y luego completa tus datos. Tu entrada aparece en el feed de inmediato.",
+  "submit.manage.title": "Gestiona tu ficha",
+  "submit.manage.intro": "Inicia sesión con la dirección de tu proveedor para editar tus datos, actualizar tu logo o vincular otra red. Los cambios aparecen en el feed de inmediato.",
   "submit.reg.title": "Primero se requiere el registro on-chain",
   "submit.reg.body": "Debes ser ya un proveedor de señales FTSO registrado en Flare o Songbird antes de poder publicar aquí. Flare Registry no te registra ante Flare; lee tu registro on-chain existente. Si tu dirección aún no está registrada como entidad FTSO, regístrate primero on-chain y luego vuelve para publicar. (Las redes de prueba Coston y Coston2 están exentas.)",
   "submit.qual.summary": "¿Qué se necesita para ser Qualified?",
@@ -789,6 +793,8 @@ const zh: Dict = {
   // Submit page
   "submit.title": "发布你的提供商",
   "submit.intro": "连接你已注册的 FTSO 地址所对应的钱包，签名以证明你拥有控制权，然后填写你的详细信息。你的条目会立即出现在 feed 中。",
+  "submit.manage.title": "管理你的条目",
+  "submit.manage.intro": "使用你的提供商地址登录，即可编辑详细信息、更新徽标或关联另一个网络。更改会立即出现在 feed 中。",
   "submit.reg.title": "必须先完成链上注册",
   "submit.reg.body": "在此发布之前，你必须已经是 Flare 或 Songbird 上已注册的 FTSO 信号提供商。Flare Registry 不会替你在 Flare 上注册；它读取你现有的链上注册信息。如果你的地址尚未注册为 FTSO 实体，请先完成链上注册，然后再回来发布。（Coston 和 Coston2 测试网除外。）",
   "submit.qual.summary": "成为 Qualified 需要什么？",
@@ -1119,6 +1125,8 @@ const ja: Dict = {
   // Submit page
   "submit.title": "プロバイダーを掲載する",
   "submit.intro": "登録済み FTSO アドレスのウォレットを接続し、署名して制御を証明したうえで詳細を入力してください。あなたのエントリーはすぐに feed に表示されます。",
+  "submit.manage.title": "掲載を管理",
+  "submit.manage.intro": "プロバイダーアドレスでサインインして、詳細の編集、ロゴの更新、別ネットワークの連携ができます。変更はすぐに feed に反映されます。",
   "submit.reg.title": "まずオンチェーン登録が必要です",
   "submit.reg.body": "ここに掲載する前に、Flare または Songbird で登録済みの FTSO シグナルプロバイダーである必要があります。Flare Registry は Flare への登録を代行しません。既存のオンチェーン登録を読み取るだけです。アドレスがまだ FTSO エンティティとして登録されていない場合は、先にオンチェーンで登録してから掲載に戻ってください。（Coston および Coston2 テストネットは対象外です。）",
   "submit.qual.summary": "Qualified になるには何が必要ですか？",
@@ -1448,6 +1456,8 @@ const ko: Dict = {
   // Submit page
   "submit.title": "프로바이더 등록하기",
   "submit.intro": "등록된 FTSO 주소의 지갑을 연결하고, 서명하여 통제권을 증명한 다음 세부 정보를 입력하세요. 항목은 즉시 feed에 표시됩니다.",
+  "submit.manage.title": "리스팅 관리",
+  "submit.manage.intro": "프로바이더 주소로 로그인하여 세부 정보를 편집하거나 로고를 업데이트하거나 다른 네트워크를 연결하세요. 변경 사항은 즉시 feed에 표시됩니다.",
   "submit.reg.title": "먼저 온체인 등록이 필요합니다",
   "submit.reg.body": "여기에 등록하려면 먼저 Flare 또는 Songbird에 등록된 FTSO 시그널 프로바이더여야 합니다. Flare Registry은 Flare에 대신 등록해 주지 않으며, 기존 온체인 등록을 읽을 뿐입니다. 주소가 아직 FTSO 엔티티로 등록되지 않았다면 먼저 온체인에서 등록한 뒤 다시 돌아와 등록하세요. (Coston 및 Coston2 테스트넷은 예외입니다.)",
   "submit.qual.summary": "Qualified가 되려면 무엇이 필요한가요?",
@@ -1778,6 +1788,8 @@ const de: Dict = {
   // Submit page
   "submit.title": "Listen Sie Ihren Anbieter",
   "submit.intro": "Verbinden Sie die Wallet Ihrer registrierten FTSO-Adresse, signieren Sie zum Nachweis der Kontrolle und tragen Sie dann Ihre Daten ein. Ihr Eintrag erscheint sofort im Feed.",
+  "submit.manage.title": "Eintrag verwalten",
+  "submit.manage.intro": "Melden Sie sich mit Ihrer Anbieteradresse an, um Ihre Daten zu bearbeiten, Ihr Logo zu aktualisieren oder ein weiteres Netzwerk zu verknuepfen. Aenderungen erscheinen sofort im Feed.",
   "submit.reg.title": "Eine On-Chain-Registrierung ist zuerst erforderlich",
   "submit.reg.body": "Sie müssen bereits ein registrierter FTSO-Signalanbieter auf Flare oder Songbird sein, bevor Sie sich hier listen können. Flare Registry registriert Sie nicht bei Flare; es liest Ihre bestehende On-Chain-Registrierung. Wenn Ihre Adresse noch nicht als FTSO-Entität registriert ist, registrieren Sie sich zuerst On-Chain und kommen Sie dann zum Listen zurück. (Die Testnetze Coston und Coston2 sind ausgenommen.)",
   "submit.qual.summary": "Was braucht es, um Qualified zu sein?",
@@ -2112,6 +2124,8 @@ const fr: Dict = {
   // Submit page
   "submit.title": "Référencez votre fournisseur",
   "submit.intro": "Connectez le portefeuille de votre adresse FTSO enregistrée, signez pour prouver que vous la contrôlez, puis renseignez vos informations. Votre entrée apparaît immédiatement dans le feed.",
+  "submit.manage.title": "Gérer votre fiche",
+  "submit.manage.intro": "Connectez-vous avec votre adresse de fournisseur pour modifier vos informations, mettre a jour votre logo ou lier un autre reseau. Les changements apparaissent immediatement dans le feed.",
   "submit.reg.title": "Un enregistrement on-chain est requis au préalable",
   "submit.reg.body": "Vous devez déjà être un fournisseur de signaux FTSO enregistré sur Flare ou Songbird avant de pouvoir vous référencer ici. Flare Registry ne vous enregistre pas auprès de Flare ; il lit votre enregistrement on-chain existant. Si votre adresse n'est pas encore enregistrée en tant qu'entité FTSO, enregistrez-vous d'abord on-chain, puis revenez pour vous référencer. (Les réseaux de test Coston et Coston2 sont exemptés.)",
   "submit.qual.summary": "Que faut-il pour être Qualified ?",
