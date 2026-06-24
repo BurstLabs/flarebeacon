@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { CHAINS } from "@/lib/chains";
 import { checkContent } from "@/lib/content-filter";
@@ -92,9 +92,12 @@ export default function SubmitPage() {
   // "Manage" mode: arrived from a provider's "Manage this listing" link (/submit?manage=1). Shows
   // edit-oriented copy and hides the new-listing "registration required" notice, since the visitor
   // already has a listing. Plain /submit stays the "List your provider" create flow.
-  const [manage] = useState<boolean>(
-    () => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("manage")
-  );
+  // Read after mount: a useState lazy initializer runs during SSR (window undefined -> false) and
+  // React keeps that hydrated value, so the manage flag must be set in an effect on the client.
+  const [manage, setManage] = useState(false);
+  useEffect(() => {
+    setManage(new URLSearchParams(window.location.search).has("manage"));
+  }, []);
   const [step, setStep] = useState<Step>("connect");
   const [address, setAddress] = useState<string>("");
   const [chainId, setChainId] = useState<number>(14);
