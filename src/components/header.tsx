@@ -3,11 +3,24 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useApp } from "./providers";
 import { LOCALES, LOCALE_NAMES } from "@/lib/i18n";
 
 export function Header() {
   const { t, theme, toggleTheme, locale, setLocale } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // "List your provider" -> /submit. If we're already on /submit (e.g. /submit?manage=1), a plain
+  // <Link> to the same pathname is a no-op, so the manage param never clears. Force a full reload
+  // to /submit so the page restarts in the fresh create flow.
+  function goToSubmit(e: React.MouseEvent) {
+    if (pathname === "/submit") {
+      e.preventDefault();
+      window.location.href = "/submit";
+    }
+  }
   const [langOpen, setLangOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const langRef = useRef<HTMLDivElement>(null);
@@ -50,6 +63,7 @@ export function Header() {
           </Link>
           <Link
             href="/submit"
+            onClick={goToSubmit}
             className="hidden px-2 text-sm text-muted hover:text-beacon sm:inline"
           >
             {t("nav.list")}
@@ -149,7 +163,10 @@ export function Header() {
                 <Link
                   key={l.href}
                   href={l.href}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={(e) => {
+                    setMenuOpen(false);
+                    if (l.href === "/submit") goToSubmit(e);
+                  }}
                   className="py-2 text-sm text-muted hover:text-beacon"
                 >
                   {l.label}
