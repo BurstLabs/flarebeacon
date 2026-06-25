@@ -96,6 +96,10 @@ function SubmitPageInner() {
   // provider" in the nav) updates it without a remount, so the mode flips correctly.
   const manage = useSearchParams().has("manage");
   const [step, setStep] = useState<Step>("connect");
+  // In manage mode we arrive already signed in (from the detail page's inline connect), so we
+  // resolve the session before painting. Until that check settles, suppress the connect screen so
+  // it doesn't flash for a frame before jumping to the prefilled form. Starts true only for manage.
+  const [resolvingSession, setResolvingSession] = useState<boolean>(manage);
   const [address, setAddress] = useState<string>("");
   const [chainId, setChainId] = useState<number>(14);
   const [error, setError] = useState<string>("");
@@ -118,6 +122,10 @@ function SubmitPageInner() {
   // If we're sitting on a signed-in, prefilled listing, reset back to the empty connect step so
   // the create flow isn't shown with someone's existing data and a contradictory title.
   useEffect(() => {
+    if (!manage) {
+      // Left manage mode (clicked "List your provider"): never suppress the create flow's UI.
+      setResolvingSession(false);
+    }
     if (!manage && (existing || step !== "connect")) {
       setStep("connect");
       setAddress("");
@@ -148,6 +156,9 @@ function SubmitPageInner() {
         if (!cancelled) setStep("form");
       } catch {
         /* not signed in; the normal connect flow stays */
+      } finally {
+        // Session resolved (signed in -> form, or not -> show connect): stop suppressing the UI.
+        if (!cancelled) setResolvingSession(false);
       }
     })();
     return () => {
@@ -445,7 +456,13 @@ function SubmitPageInner() {
         </div>
       )}
 
-      {step === "connect" && (
+      {/* Manage mode resolves the existing session first; suppress the connect screen until then so
+          it doesn't flash for a frame before jumping to the prefilled form. */}
+      {step === "connect" && resolvingSession && (
+        <div className="py-8 text-sm text-muted">{t("submit.manage.loading")}</div>
+      )}
+
+      {step === "connect" && !resolvingSession && (
         <div className="space-y-4">
           <div className="rounded border border-flare/40 bg-flare/10 px-3 py-2 text-xs text-flare">
             <p className="font-medium">{t("submit.warn.title")}</p>
