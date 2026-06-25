@@ -1,15 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useApp } from "@/components/providers";
 import {
   VoteAction,
-  DefendAction,
   WithdrawAction,
-  EditGroundsAction,
-  AddGroundsAction,
-  AddDefenseEntryAction,
-  EditDefenseEntryAction,
+  ManageGroundsPanel,
+  ManageResponsePanel,
 } from "./governance-actions";
 
 export interface CaseView {
@@ -86,6 +84,29 @@ function fmt(d: string): string {
   return new Date(d).toISOString().replace("T", " ").slice(0, 16) + " UTC";
 }
 
+// Relative time ("2h ago") with the full UTC timestamp on hover. Falls back to absolute for old
+// dates. Keeps the record scannable without a wall of identical timestamps.
+function relTime(d: string, now: number): string {
+  const diff = now - new Date(d).getTime();
+  const s = Math.round(diff / 1000);
+  if (s < 45) return "just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.round(h / 24);
+  if (days < 7) return `${days}d ago`;
+  return fmt(d);
+}
+
+function RelTime({ at, now }: { at: string; now: number }) {
+  return (
+    <time dateTime={at} title={fmt(at)} className="cursor-help">
+      {relTime(at, now)}
+    </time>
+  );
+}
+
 function short(a: string): string {
   return `${a.slice(0, 6)}...${a.slice(-4)}`;
 }
@@ -95,27 +116,41 @@ function memberLabel(member: string, name: string | null): string {
   return name ? `${name} (${short(member)})` : short(member);
 }
 
-// Renders one text block with an "edited" marker and an expandable public revision history. Shared
-// by the members' grounds and the provider's response (primary and each supplemental entry).
-function GroundsBlock({
+// One entry in a party's list: a label row (e.g. "Point 1" + time), the text, an "edited" pill, and
+// an expandable public revision history. Shared by the members' grounds and the provider's response.
+function EntryBlock({
+  label,
+  at,
   text,
   editedAt,
   priorVersions,
+  now,
   t,
 }: {
+  label: string;
+  at: string;
   text: string;
   editedAt: string | null;
   priorVersions: { text: string; at: string }[];
+  now: number;
   t: T;
 }) {
   return (
-    <>
+    <div className="text-sm">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-faint">
+        <span className="font-medium text-muted">{label}</span>
+        <span>&middot;</span>
+        <RelTime at={at} now={now} />
+        {editedAt && (
+          <span
+            title={fmt(editedAt)}
+            className="cursor-help rounded bg-elev px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-faint"
+          >
+            {t("gov.case.edited")}
+          </span>
+        )}
+      </div>
       <p className="mt-1 whitespace-pre-wrap">{text}</p>
-      {editedAt && (
-        <div className="mt-0.5 text-xs italic text-faint">
-          {t("gov.case.editedAt", { at: fmt(editedAt) })}
-        </div>
-      )}
       {priorVersions.length > 0 && (
         <details className="mt-2 rounded border border-themed bg-elev/40 p-2 text-xs">
           <summary className="cursor-pointer text-muted hover:text-beacon">
@@ -127,7 +162,7 @@ function GroundsBlock({
               <li key={k} className="border-l-2 border-themed pl-2">
                 <div className="text-faint">
                   {k === 0 ? t("gov.case.history.original") : t("gov.case.history.revised")} &middot;{" "}
-                  {fmt(r.at)}
+                  <RelTime at={r.at} now={now} />
                 </div>
                 <p className="mt-0.5 whitespace-pre-wrap text-muted">{r.text}</p>
               </li>
@@ -135,7 +170,7 @@ function GroundsBlock({
           </ul>
         </details>
       )}
-    </>
+    </div>
   );
 }
 
@@ -154,6 +189,8 @@ function outcomeLabel(t: T, state: string): { text: string; cls: string } {
 
 export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
   const { t } = useApp();
+  // Stable "now" for relative timestamps (set once on mount; avoids hydration mismatch).
+  const [now] = useState(() => Date.now());
   const idx = stageIndex(v.state);
   const decided = idx === 3;
   const isPending = v.state === "PENDING";
@@ -275,52 +312,63 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         {v.state === "OPEN_VOTING" && <VoteAction caseId={v.id} />}
       </div>
 
-      {/* Grounds from co-initiators. */}
+      {/* Grounds from co-initiators. Each member's points render as one uniform list; all editing
+          lives in a single collapsed "manage" panel at the bottom, so the record reads cleanly. */}
       <div className="mt-6 surface rounded-xl border p-5">
-        <h2 className="mb-3 text-lg font-semibold">{t("gov.case.whyFlagged")}</h2>
+        <h2 className="text-lg font-semibold">{t("gov.case.whyFlagged")}</h2>
+        <p className="mt-1 mb-4 text-xs text-muted">{t("gov.case.whyFlaggedHelp")}</p>
         {v.initiations.length === 0 ? (
           <p className="text-sm text-muted">{t("gov.case.noGrounds")}</p>
         ) : (
-          <ul className="space-y-5">
+          <ul className="space-y-6">
             {v.initiations.map((i, n) => {
               const preVote = v.state === "PENDING" || v.state === "OPEN_DISCUSSION";
+              // The member's points: primary grounds first, then supplementals, as one numbered list.
+              const points = [
+                {
+                  id: "primary",
+                  entryId: undefined as string | undefined,
+                  text: i.grounds,
+                  at: i.at,
+                  editedAt: i.editedAt,
+                  priorVersions: i.priorVersions.map((r) => ({ text: r.grounds, at: r.at })),
+                },
+                ...i.entries.map((e) => ({
+                  id: e.id,
+                  entryId: e.id,
+                  text: e.grounds,
+                  at: e.at,
+                  editedAt: e.editedAt,
+                  priorVersions: e.priorVersions.map((r) => ({ text: r.grounds, at: r.at })),
+                })),
+              ];
               return (
-                <li key={n} className="text-sm">
-                  <div className="text-xs text-faint">
-                    {t("gov.case.mgMemberPrefix")} {memberLabel(i.member, i.memberName)} &middot; {fmt(i.at)}
+                <li key={n}>
+                  <div className="mb-2 text-xs text-faint">
+                    {t("gov.case.mgMemberPrefix")} {memberLabel(i.member, i.memberName)}
                   </div>
-                  {/* Primary grounds. */}
-                  <GroundsBlock
-                    text={i.grounds}
-                    editedAt={i.editedAt}
-                    priorVersions={i.priorVersions.map((r) => ({ text: r.grounds, at: r.at }))}
-                    t={t}
-                  />
-                  {/* Edit affordance for the primary grounds (signature-gated server-side). */}
-                  {preVote && <EditGroundsAction caseId={v.id} />}
-
-                  {/* Supplemental entries from the same member (informational). */}
-                  {i.entries.length > 0 && (
-                    <ul className="mt-3 space-y-3 border-l-2 border-beacon/30 pl-3">
-                      {i.entries.map((e) => (
-                        <li key={e.id}>
-                          <div className="text-xs text-faint">
-                            {t("gov.case.supplemental")} &middot; {fmt(e.at)}
-                          </div>
-                          <GroundsBlock
-                            text={e.grounds}
-                            editedAt={e.editedAt}
-                            priorVersions={e.priorVersions.map((r) => ({ text: r.grounds, at: r.at }))}
-                            t={t}
-                          />
-                          {preVote && <EditGroundsAction caseId={v.id} entryId={e.id} />}
-                        </li>
-                      ))}
-                    </ul>
+                  <ul className="space-y-3 border-l-2 border-beacon/30 pl-3">
+                    {points.map((p, k) => (
+                      <li key={p.id}>
+                        <EntryBlock
+                          label={t("gov.case.point", { n: k + 1 })}
+                          at={p.at}
+                          text={p.text}
+                          editedAt={p.editedAt}
+                          priorVersions={p.priorVersions}
+                          now={now}
+                          t={t}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                  {/* One collapsed manage panel for this member's grounds (edit each / add). */}
+                  {preVote && (
+                    <ManageGroundsPanel
+                      caseId={v.id}
+                      entries={points.map((p) => ({ entryId: p.entryId, label: i.memberName ?? "", at: p.at }))}
+                    />
                   )}
-
-                  {/* Add another (supplemental) entry under this member's flag. */}
-                  {preVote && <AddGroundsAction caseId={v.id} />}
                 </li>
               );
             })}
@@ -328,49 +376,63 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         )}
       </div>
 
-      {/* Subject's public defense: primary response + supplemental entries, each with history. */}
+      {/* Subject's public response: primary + supplemental entries as one list; editing is tucked
+          into a single collapsed manage panel. */}
       <div className="mt-6 surface rounded-xl border p-5">
-        <h2 className="mb-2 text-lg font-semibold">{t("gov.case.providerResponse")}</h2>
+        <h2 className="text-lg font-semibold">{t("gov.case.providerResponse")}</h2>
+        <p className="mt-1 mb-4 text-xs text-muted">{t("gov.case.providerResponseHelp")}</p>
         {v.defense ? (
-          <div className="text-sm">
-            <div className="text-xs text-faint">{fmt(v.defense.at)}</div>
-            <GroundsBlock
-              text={v.defense.body}
-              editedAt={v.defense.editedAt}
-              priorVersions={v.defense.priorVersions.map((r) => ({ text: r.body, at: r.at }))}
-              t={t}
-            />
-            {/* Edit the primary response (reuses the post box, prefilled). */}
-            {!decided && <DefendAction caseId={v.id} current={v.defense.body} />}
-
-            {v.defense.entries.length > 0 && (
-              <ul className="mt-3 space-y-3 border-l-2 border-beacon/30 pl-3">
-                {v.defense.entries.map((e) => (
-                  <li key={e.id}>
-                    <div className="text-xs text-faint">
-                      {t("gov.case.supplemental")} &middot; {fmt(e.at)}
-                    </div>
-                    <GroundsBlock
-                      text={e.body}
-                      editedAt={e.editedAt}
-                      priorVersions={e.priorVersions.map((r) => ({ text: r.body, at: r.at }))}
-                      t={t}
-                    />
-                    {!decided && (
-                      <EditDefenseEntryAction caseId={v.id} entryId={e.id} current={e.body} />
-                    )}
-                  </li>
-                ))}
-              </ul>
+          <>
+            {(() => {
+              const points = [
+                {
+                  id: "primary",
+                  entryId: undefined as string | undefined,
+                  text: v.defense.body,
+                  at: v.defense.at,
+                  editedAt: v.defense.editedAt,
+                  priorVersions: v.defense.priorVersions.map((r) => ({ text: r.body, at: r.at })),
+                },
+                ...v.defense.entries.map((e) => ({
+                  id: e.id,
+                  entryId: e.id,
+                  text: e.body,
+                  at: e.at,
+                  editedAt: e.editedAt,
+                  priorVersions: e.priorVersions.map((r) => ({ text: r.body, at: r.at })),
+                })),
+              ];
+              return (
+                <ul className="space-y-3 border-l-2 border-beacon/30 pl-3">
+                  {points.map((p, k) => (
+                    <li key={p.id}>
+                      <EntryBlock
+                        label={t("gov.case.point", { n: k + 1 })}
+                        at={p.at}
+                        text={p.text}
+                        editedAt={p.editedAt}
+                        priorVersions={p.priorVersions}
+                        now={now}
+                        t={t}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+            {!decided && (
+              <ManageResponsePanel
+                caseId={v.id}
+                hasPrimary
+                primaryBody={v.defense.body}
+                entries={v.defense.entries.map((e) => ({ entryId: e.id, body: e.body }))}
+              />
             )}
-
-            {/* Add another response entry. */}
-            {!decided && <AddDefenseEntryAction caseId={v.id} />}
-          </div>
+          </>
         ) : (
           <>
             <p className="text-sm text-muted">{t("gov.case.noResponse")}</p>
-            {!decided && <DefendAction caseId={v.id} current={null} />}
+            {!decided && <ManageResponsePanel caseId={v.id} hasPrimary={false} primaryBody="" entries={[]} />}
           </>
         )}
       </div>

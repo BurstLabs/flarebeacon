@@ -209,11 +209,21 @@ export function WithdrawAction({ caseId }: { caseId: string }) {
 // Edit-grounds panel, shown on a pre-vote case page. The Management Group member who raised the
 // flag can revise their grounds; the new text replaces the current grounds while every version is
 // kept on the public record. Signature-gated server-side, so non-flagging members are rejected.
-export function EditGroundsAction({ caseId, entryId }: { caseId: string; entryId?: string }) {
+export function EditGroundsAction({
+  caseId,
+  entryId,
+  current = "",
+  label,
+}: {
+  caseId: string;
+  entryId?: string;
+  current?: string;
+  label?: string;
+}) {
   const { t } = useApp();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [grounds, setGrounds] = useState("");
+  const [grounds, setGrounds] = useState(current);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
@@ -236,7 +246,6 @@ export function EditGroundsAction({ caseId, entryId }: { caseId: string; entryId
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.editFailed"));
       setOk(b.unchanged ? t("gov.act.editUnchanged") : t("gov.act.editSaved"));
-      setGrounds("");
       setOpen(false);
       router.refresh();
     } catch (e) {
@@ -247,15 +256,15 @@ export function EditGroundsAction({ caseId, entryId }: { caseId: string; entryId
   }
 
   return (
-    <div className="mt-4 border-t border-themed pt-4">
+    <div className="mt-1">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="text-sm font-medium text-muted hover:text-beacon"
+        className="text-xs font-medium text-muted hover:text-beacon"
       >
-        {t("gov.act.editToggle")} {open ? "−" : "+"}
+        {label ?? t("gov.act.editToggle")} {open ? "−" : "+"}
       </button>
       {open && (
-        <div className="mt-3">
+        <div className="mt-2">
           <p className="text-xs text-muted">{t("gov.act.editBlurb")}</p>
           <textarea
             value={grounds}
@@ -409,9 +418,20 @@ export function VoteAction({ caseId }: { caseId: string }) {
 
 // Defense box, shown on a case page for the flagged provider. Posting/editing the primary response
 // is signature-gated: the provider signs with a wallet that controls one of its listed addresses.
-export function DefendAction({ caseId, current }: { caseId: string; current: string | null }) {
+export function DefendAction({
+  caseId,
+  current,
+  collapsedLabel,
+}: {
+  caseId: string;
+  current: string | null;
+  // When set, the box starts collapsed behind a toggle with this label (used for "edit the primary
+  // response" inside the manage panel). When absent, the box is shown open (first-time posting).
+  collapsedLabel?: string;
+}) {
   const { t } = useApp();
   const router = useRouter();
+  const [open, setOpen] = useState(!collapsedLabel);
   const [body, setBody] = useState(current ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -432,6 +452,7 @@ export function DefendAction({ caseId, current }: { caseId: string; current: str
       if (!res.ok)
         throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.defendFailedAuth"));
       setOk(b.unchanged ? t("gov.act.editUnchanged") : t("gov.act.defendPosted"));
+      if (collapsedLabel) setOpen(false);
       router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("gov.act.err.defendFailed"));
@@ -440,9 +461,20 @@ export function DefendAction({ caseId, current }: { caseId: string; current: str
     }
   }
 
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-1 text-xs font-medium text-muted hover:text-beacon"
+      >
+        {collapsedLabel} +
+      </button>
+    );
+  }
+
   return (
-    <div className="mt-4">
-      <p className="text-sm text-muted">{t("gov.act.defendBlurb")}</p>
+    <div className="mt-2">
+      {!collapsedLabel && <p className="text-sm text-muted">{t("gov.act.defendBlurb")}</p>}
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
@@ -535,10 +567,12 @@ export function EditDefenseEntryAction({
   caseId,
   entryId,
   current,
+  label,
 }: {
   caseId: string;
   entryId: string;
   current: string;
+  label?: string;
 }) {
   const { t } = useApp();
   const router = useRouter();
@@ -578,7 +612,7 @@ export function EditDefenseEntryAction({
         onClick={() => setOpen((o) => !o)}
         className="text-xs font-medium text-muted hover:text-beacon"
       >
-        {t("gov.act.editResponseToggle")} {open ? "−" : "+"}
+        {label ?? t("gov.act.editResponseToggle")} {open ? "−" : "+"}
       </button>
       {open && (
         <div className="mt-2">
@@ -598,6 +632,93 @@ export function EditDefenseEntryAction({
           </button>
           {err && <Note kind="err" text={err} />}
           {ok && <Note kind="ok" text={ok} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One collapsed "manage" affordance for a member's grounds. Keeps all editing tools out of the
+// public record until "Are you this member?" is expanded; then shows a per-point edit + add control.
+// Server-side signature gating means non-owners who expand it simply cannot save.
+export function ManageGroundsPanel({
+  caseId,
+  entries,
+}: {
+  caseId: string;
+  // One per point, in display order. entryId undefined = the primary grounds.
+  entries: { entryId?: string; label: string; at: string }[];
+}) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-3 border-t border-themed pt-3">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs font-medium text-muted hover:text-beacon"
+      >
+        {t("gov.act.manageGroundsToggle")} {open ? "−" : "+"}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-faint">{t("gov.act.manageGroundsBlurb")}</p>
+          {entries.map((e, k) => (
+            <EditGroundsAction
+              key={e.entryId ?? "primary"}
+              caseId={caseId}
+              entryId={e.entryId}
+              label={t("gov.act.editPoint", { n: k + 1 })}
+            />
+          ))}
+          <AddGroundsAction caseId={caseId} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// One collapsed "manage" affordance for the provider's response. Same idea as ManageGroundsPanel.
+export function ManageResponsePanel({
+  caseId,
+  hasPrimary,
+  primaryBody,
+  entries,
+}: {
+  caseId: string;
+  hasPrimary: boolean;
+  primaryBody: string;
+  entries: { entryId: string; body: string }[];
+}) {
+  const { t } = useApp();
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-3 border-t border-themed pt-3">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-xs font-medium text-muted hover:text-beacon"
+      >
+        {t("gov.act.manageResponseToggle")} {open ? "−" : "+"}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-faint">{t("gov.act.manageResponseBlurb")}</p>
+          {/* Primary response: post it (if none yet) or edit it. */}
+          <DefendAction
+            caseId={caseId}
+            current={hasPrimary ? primaryBody : null}
+            collapsedLabel={hasPrimary ? t("gov.act.editPoint", { n: 1 }) : undefined}
+          />
+          {entries.map((e, k) => (
+            <EditDefenseEntryAction
+              key={e.entryId}
+              caseId={caseId}
+              entryId={e.entryId}
+              current={e.body}
+              label={t("gov.act.editPoint", { n: k + 2 })}
+            />
+          ))}
+          {/* Adding more entries requires a primary response to exist first. */}
+          {hasPrimary && <AddDefenseEntryAction caseId={caseId} />}
         </div>
       )}
     </div>
