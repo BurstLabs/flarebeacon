@@ -73,9 +73,6 @@ export function FlagAction({ providerId }: { providerId: string }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-  // Set to the pending case id after this member co-initiates, so they can withdraw it while it
-  // is still pending (before a second member opens the case).
-  const [pendingCaseId, setPendingCaseId] = useState<string | null>(null);
 
   async function submit() {
     setErr("");
@@ -94,42 +91,19 @@ export function FlagAction({ providerId }: { providerId: string }) {
       });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.flagFailed"));
-      if (b.opened) {
-        setOk(t("gov.act.flagOpened"));
-        setPendingCaseId(null);
-      } else {
-        setOk(t("gov.act.flagRecorded", { n: b.initiations, required: b.required }));
-        setPendingCaseId(b.caseId ?? null);
+      // On success, go straight into the Governance review for this case (where the flag, its
+      // grounds, and the withdraw option live), instead of leaving the member on the provider page.
+      if (b.caseId) {
+        setOk(t("gov.act.flagRecordedRedirect"));
+        router.push(`/governance/${b.caseId}`);
+        return;
       }
+      // Fallback (shouldn't happen): show a status message and refresh in place.
+      setOk(b.opened ? t("gov.act.flagOpened") : t("gov.act.flagRecordedRedirect"));
       setGrounds("");
-      // Re-render the server component so the pending-flag banner appears without a manual reload.
       router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("gov.act.err.flagFailed"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function withdraw() {
-    if (!pendingCaseId) return;
-    setErr("");
-    setOk("");
-    setBusy(true);
-    try {
-      const s = await signChallenge(t);
-      const res = await fetch("/api/governance/unflag", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ caseId: pendingCaseId, message: s.message, signature: s.signature }),
-      });
-      const b = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.withdrawFailed"));
-      setOk(t("gov.act.withdrawn"));
-      setPendingCaseId(null);
-      router.refresh();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : t("gov.act.err.withdrawFailed"));
     } finally {
       setBusy(false);
     }
@@ -158,19 +132,7 @@ export function FlagAction({ providerId }: { providerId: string }) {
             >
               {busy ? t("gov.act.signing") : t("gov.act.signSubmit")}
             </button>
-            {pendingCaseId && (
-              <button
-                onClick={withdraw}
-                disabled={busy}
-                className="rounded-lg border border-themed px-4 py-2 font-medium text-muted hover:text-beacon disabled:opacity-50"
-              >
-                {t("gov.act.withdrawMyFlag")}
-              </button>
-            )}
           </div>
-          {pendingCaseId && (
-            <p className="mt-2 text-xs text-faint">{t("gov.act.withdrawHint")}</p>
-          )}
           {err && <Note kind="err" text={err} />}
           {ok && <Note kind="ok" text={ok} />}
         </div>
