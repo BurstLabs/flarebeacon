@@ -6,7 +6,10 @@ import { loadMembers, memberVoterFor } from "@/lib/governance";
 
 // POST /api/governance/unflag
 // A member withdraws their own co-initiation. Only allowed while the case is still PENDING (i.e.
-// before a second member has joined and opened it). Removing the last initiation deletes the case.
+// before a second member has joined and opened it). Removing the last initiation ARCHIVES the case
+// as WITHDRAWN (state preserved + readable) rather than deleting it, so the record of the flag, its
+// grounds, and any provider response is not lost. A withdrawn flag never opened, so it does not
+// consume the provider's one-flag chance.
 // Body: { caseId, message, signature }
 export async function POST(req: NextRequest) {
   const limited = rateLimit(req, "governance", 10, 60_000);
@@ -51,12 +54,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "you have not co-initiated this flag" }, { status: 404 });
   }
 
+  const totalInitiations = await prisma.providerFlagInitiation.count({ where: { caseId } });
+
   const remaining = await prisma.$transaction(async (tx) => {
-    await tx.providerFlagInitiation.delete({ where: { id: mine.id } });
-    const count = await tx.providerFlagInitiation.count({ where: { caseId } });
-    // No co-initiators left: drop the empty pending case entirely.
-    if (count === 0) await tx.providerFlagCase.delete({ where: { id: caseId } });
-    return count;
+    if (totalInitiations > 1) {
+      // Other co-initiators remain: just remove this member's initiation; the case lives on.
+      await tx.providerFlagInitiation.delete({ where: { id: mine.id } });
+      return totalInitiations - 1;
+    }
+    // This is the last co-initiator. ARCHIVE the case as WITHDRAWN instead of deleting it, and KEEP
+    // the initiation (its grounds + history are the record we are preserving). The case never opened,
+    // so the provider's one-flag chance is untouched (flaggedOnce stays false). The member is marked
+    // as the withdrawer for the public record.
+    await tx.providerFlagInitiation.update({
+      where: { id: mine.id },
+      data: { withdrawnAt: new Date() },
+    });
+    await tx.providerFlagCase.update({
+      where: { id: caseId },
+      data: { state: "WITHDRAWN", decidedAt: new Date() },
+    });
+    return 0;
   });
 
   return NextResponse.json({ ok: true, remaining, caseClosed: remaining === 0 });

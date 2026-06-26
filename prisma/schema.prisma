@@ -252,6 +252,9 @@ model ProviderFlagInitiation {
   createdAt         DateTime         @default(now())
   // Set when the grounds were last edited (null = never edited, still the original text).
   editedAt          DateTime?
+  // Set when this co-initiator withdrew their flag (the case is then archived WITHDRAWN). The
+  // initiation is kept for the public record rather than deleted.
+  withdrawnAt       DateTime?
 
   revisions ProviderFlagGroundsRevision[]
   // Supplemental grounds the same member adds later (extra evidence/notes). Informational only:

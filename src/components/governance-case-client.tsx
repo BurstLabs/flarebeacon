@@ -83,6 +83,7 @@ function stageIndex(state: string): number {
     case "FAILED_QUORUM":
       return 3;
     default:
+      // PENDING and WITHDRAWN both sit at the "Flagged" stage; WITHDRAWN is handled separately.
       return 0;
   }
 }
@@ -220,8 +221,10 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
   // Stable "now" for relative timestamps (set once on mount; avoids hydration mismatch).
   const [now] = useState(() => Date.now());
   const idx = stageIndex(v.state);
-  const decided = idx === 3;
-  const isPending = v.state === "PENDING";
+  const isWithdrawn = v.state === "WITHDRAWN";
+  // A withdrawn case is archived/read-only: treat it like a finished case for edit-gating.
+  const decided = idx === 3 || isWithdrawn;
+  const isPending = v.state === "PENDING" && !isWithdrawn;
   const quorumMet = v.votesCast >= v.turnoutFloor;
 
   const STAGES = [
@@ -259,6 +262,14 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
           </div>
           <WithdrawAction caseId={v.id} />
         </>
+      )}
+
+      {/* Archived: the flag was withdrawn before a second member joined. Kept as a read-only record. */}
+      {isWithdrawn && (
+        <div className="mt-4 rounded-lg border border-themed bg-elev/50 px-4 py-3 text-sm text-muted">
+          <span className="font-medium text-fg">{t("gov.case.withdrawn.title")}</span>{" "}
+          {t("gov.case.withdrawn.body")}
+        </div>
       )}
 
       {/* Full status progress bar, visible to everyone. */}
