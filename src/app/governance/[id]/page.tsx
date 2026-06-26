@@ -106,6 +106,7 @@ export default async function GovernanceCasePage({
     suspended: c.provider.suspended,
     state: c.state,
     isReVote: c.isReVote,
+    raisedAt: c.createdAt.toISOString(),
     openedAt: c.openedAt.toISOString(),
     discussionEndsAt: c.discussionEndsAt.toISOString(),
     votingEndsAt: c.votingEndsAt.toISOString(),

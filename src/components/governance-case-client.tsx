@@ -21,6 +21,9 @@ export interface CaseView {
   suspended: boolean;
   state: string;
   isReVote: boolean;
+  // When the flag was first raised (PENDING). The discussion window starts at openedAt, which is a
+  // later, distinct moment (the 2nd co-initiator opening the case).
+  raisedAt: string;
   openedAt: string;
   discussionEndsAt: string;
   votingEndsAt: string;
@@ -315,12 +318,14 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         </div>
 
         <div className="mt-5 grid gap-2 text-xs text-muted sm:grid-cols-2">
-          {/* "Opened" here is when the flag was raised. The discussion/voting deadlines only become
-              real once a second member opens the case, so for a flag that never opened (PENDING or
-              WITHDRAWN) they are placeholders and we suppress them to avoid showing misleading dates. */}
-          <div>{t("gov.case.flagRaised")} {fmt(v.openedAt)}</div>
+          {/* The flag-raised time (createdAt) is when a member first flagged. The discussion window
+              starts later, at openedAt, when a 2nd member opens the case, and only then are the
+              discussion/voting deadlines real. Before opening (PENDING/WITHDRAWN) we suppress those
+              forward dates to avoid implying a schedule that has not started. */}
+          <div>{t("gov.case.flagRaised")} {fmt(v.raisedAt)}</div>
           {hasOpened && (
             <>
+              <div>{t("gov.case.discussionStarted")} {fmt(v.openedAt)}</div>
               <div>{t("gov.case.discussionEnds")} {fmt(v.discussionEndsAt)}</div>
               <div>{t("gov.case.votingEnds")} {fmt(v.votingEndsAt)}</div>
             </>

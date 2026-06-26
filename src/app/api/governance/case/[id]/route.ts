@@ -65,6 +65,9 @@ export async function GET(
     suspended: c.provider.suspended,
     state: c.state,
     isReVote: c.isReVote,
+    // When the flag was first raised (PENDING). The discussion window only starts once the case
+    // opens (a 2nd member co-initiates), which is openedAt — these are distinct moments.
+    raisedAt: c.createdAt,
     openedAt: c.openedAt,
     discussionEndsAt: c.discussionEndsAt,
     votingEndsAt: c.votingEndsAt,
