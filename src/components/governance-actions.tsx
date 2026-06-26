@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/providers";
 import { switchWalletChain } from "@/lib/chains";
@@ -37,9 +37,24 @@ async function signChallenge(t: TFn): Promise<{ address: string; message: string
   return { address, message, signature };
 }
 
+// Inline status line under an action. Errors scroll themselves into view, because some action boxes
+// (notably the provider response) sit at the bottom of a long case page, where a rejection rendered
+// in place would otherwise be off-screen and read as a silent no-op.
 function Note({ kind, text }: { kind: "err" | "ok"; text: string }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (kind === "err" && ref.current) {
+      ref.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [kind, text]);
   return (
-    <p className={`mt-2 text-sm ${kind === "err" ? "text-flare" : "text-emerald-400"}`}>{text}</p>
+    <p
+      ref={ref}
+      role={kind === "err" ? "alert" : "status"}
+      className={`mt-2 text-sm ${kind === "err" ? "text-flare" : "text-emerald-400"}`}
+    >
+      {text}
+    </p>
   );
 }
 
