@@ -152,10 +152,12 @@ function EntryBlock({
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-faint">
         <span className="font-medium text-muted">{label}</span>
         <span>&middot;</span>
-        <RelTime at={at} now={now} />
+        {/* Show the most recent activity (last edit if any, else when posted). The "edited" pill's
+            tooltip carries the original post time so both are available. */}
+        <RelTime at={editedAt ?? at} now={now} />
         {editedAt && (
           <span
-            title={fmt(editedAt)}
+            title={t("gov.case.postedAt", { at: fmt(at) })}
             className="cursor-help rounded bg-elev px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-faint"
           >
             {t("gov.case.edited")}
