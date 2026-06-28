@@ -1,6 +1,6 @@
 {
   "name": "Flare Registry FTSO Signal Providers",
-  "timestamp": "2026-06-28T21:26:04.582Z",
+  "timestamp": "2026-06-28T21:53:54.414Z",
   "version": {
     "major": 1,
     "minor": 3,
@@ -581,10 +581,10 @@
         },
         "governance": {
           "pending": false,
-          "underReview": false,
+          "underReview": true,
           "suspended": true,
-          "caseId": "cmqv4kszm000512w6c1yyzxut",
-          "state": "DENIED"
+          "caseId": "cmqybt3kz0005it2s8o0ss3gh",
+          "state": "OPEN_DISCUSSION"
         }
       }
     },
@@ -4080,10 +4080,10 @@
         },
         "governance": {
           "pending": false,
-          "underReview": false,
+          "underReview": true,
           "suspended": true,
-          "caseId": "cmqv4kszm000512w6c1yyzxut",
-          "state": "DENIED"
+          "caseId": "cmqybt3kz0005it2s8o0ss3gh",
+          "state": "OPEN_DISCUSSION"
         }
       }
     },
