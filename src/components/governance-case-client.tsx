@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useApp } from "@/components/providers";
 import {
   VoteAction,
+  AppealAction,
   WithdrawAction,
   EditGroundsAction,
   AddGroundsAction,
@@ -205,10 +206,12 @@ function MetBadge({ met, t }: { met: boolean; t: T }) {
 // "What happens next" + appeal guidance for a denied provider. The appeal is a one-time re-vote of
 // the case, sponsored by Management Group members, openable only within the appeal window.
 function AppealPanel({
+  providerId,
   appeal,
   now,
   t,
 }: {
+  providerId: string;
   appeal: NonNullable<CaseView["appeal"]>;
   now: number;
   t: T;
@@ -238,9 +241,13 @@ function AppealPanel({
                   opensAt: fmt(appeal.opensAt),
                 })
               : windowOpen
-                ? t("gov.case.appeal.stepOpen", { closesAt: fmt(appeal.closesAt) })
+                ? t("gov.case.appeal.stepOpen")
                 : t("gov.case.appeal.stepClosed")}
         </li>
+        {/* The 1-year deadline is shown in every not-yet-final state, including cooldown. */}
+        {!used && !windowClosed && (
+          <li>{t("gov.case.appeal.stepDeadline", { closesAt: fmt(appeal.closesAt) })}</li>
+        )}
         {!used && !windowClosed && <li>{t("gov.case.appeal.stepHow")}</li>}
         {!used && !windowClosed && <li>{t("gov.case.appeal.stepOutcome")}</li>}
       </ol>
@@ -256,6 +263,8 @@ function AppealPanel({
           />
         </p>
       )}
+      {/* When the window is open, the provider can request the appeal directly (verified address). */}
+      {windowOpen && <AppealAction providerId={providerId} />}
       <p className="mt-3 text-xs text-faint">
         <Link href="/governance" className="underline hover:text-beacon">
           {t("gov.case.appeal.learnMore")}
@@ -593,7 +602,9 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
           </p>
         )}
         {/* What happens next for a denied provider, including the appeal process. */}
-        {v.appeal && <AppealPanel appeal={v.appeal} now={now} t={t} />}
+        {v.appeal && (
+          <AppealPanel providerId={v.providerId} appeal={v.appeal} now={now} t={t} />
+        )}
         {/* While voting is open, make the waiting state explicit: the case is NOT decided yet and
             stays open for the full voting period, even once the thresholds are already met. */}
         {v.state === "OPEN_VOTING" && (

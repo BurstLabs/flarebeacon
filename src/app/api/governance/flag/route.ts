@@ -9,7 +9,6 @@ import {
   memberVoterFor,
   inNewProviderWindow,
   caseDeadlines,
-  appealWindow,
   CO_INITIATORS_REQUIRED,
 } from "@/lib/governance";
 
@@ -111,43 +110,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (wantReVote) {
-    // Appeal path: only on a suspended provider, within the appeal window, once.
-    if (!provider.suspended) {
-      return NextResponse.json({ error: "provider is not suspended; nothing to appeal" }, { status: 409 });
-    }
-    const priorDenied = await prisma.providerFlagCase.findFirst({
-      where: { providerId, state: "DENIED" },
-      orderBy: { decidedAt: "desc" },
-    });
-    if (!priorDenied?.decidedAt) {
-      return NextResponse.json({ error: "no decided case to appeal" }, { status: 409 });
-    }
-    // The one permitted appeal is "used" only once it is DECIDED. An appeal case that is still
-    // open (being co-initiated or in progress) must not block its own second co-initiator.
-    const priorAppeal = await prisma.providerFlagCase.findFirst({
-      where: { providerId, isReVote: true, state: { in: ["DENIED", "CLEARED", "FAILED_QUORUM"] } },
-    });
-    if (priorAppeal) {
-      return NextResponse.json({ error: "the one permitted appeal has already been used" }, { status: 409 });
-    }
-    const win = appealWindow(priorDenied.decidedAt);
-    if (now < win.opensAt) {
-      return NextResponse.json(
-        { error: `the appeal cannot open until ${win.opensAt.toISOString()}` },
-        { status: 409 }
-      );
-    }
-    if (now > win.closesAt) {
-      return NextResponse.json({ error: "the appeal window has closed; the suspension is final" }, { status: 409 });
-    }
-  } else {
-    // First-time flag path: provider must be in the new-provider window and not flaggedOnce.
-    if (provider.flaggedOnce) {
-      return NextResponse.json({ error: "this account has already been through the flag process" }, { status: 409 });
-    }
-    if (!inNewProviderWindow(provider.createdAt, now)) {
-      return NextResponse.json({ error: "provider is past the new-provider window" }, { status: 409 });
-    }
+    // Appeals are now PROVIDER-initiated and open immediately, with no Management Group
+    // co-initiation. They live at POST /api/governance/appeal, not here.
+    return NextResponse.json(
+      { error: "appeals are requested by the provider at /api/governance/appeal" },
+      { status: 400 }
+    );
+  }
+  // First-time flag path: provider must be in the new-provider window and not flaggedOnce.
+  if (provider.flaggedOnce) {
+    return NextResponse.json({ error: "this account has already been through the flag process" }, { status: 409 });
+  }
+  if (!inNewProviderWindow(provider.createdAt, now)) {
+    return NextResponse.json({ error: "provider is past the new-provider window" }, { status: 409 });
   }
 
   // A case starts PENDING and only opens (state OPEN_DISCUSSION, deadlines and the 14-day pause

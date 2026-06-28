@@ -360,6 +360,90 @@ export function AddGroundsAction({ caseId, ownerVoter }: { caseId: string; owner
 }
 
 // Vote panel, shown on a case page while voting is open.
+// Provider-initiated appeal of a denied case. The provider signs with a verified address and the
+// appeal opens immediately (no Management Group co-initiation), running discussion then voting.
+export function AppealAction({ providerId }: { providerId: string }) {
+  const { t } = useApp();
+  const router = useRouter();
+  const [statement, setStatement] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+  const [open, setOpen] = useState(false);
+
+  async function submit() {
+    setErr("");
+    setOk("");
+    setBusy(true);
+    try {
+      const s = await signChallenge(t);
+      const res = await fetch("/api/governance/appeal", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          providerId,
+          statement: statement.trim() || undefined,
+          message: s.message,
+          signature: s.signature,
+        }),
+      });
+      const b = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.appealFailed"));
+      setOk(t("gov.act.appealOpened"));
+      router.refresh();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t("gov.act.err.appealFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-3 rounded-lg border border-beacon px-4 py-2 text-sm font-medium text-beacon hover:bg-beacon/10"
+      >
+        {t("gov.act.appealRequest")}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-lg border border-themed bg-elev/40 p-3">
+      <p className="text-sm font-medium">{t("gov.act.appealTitle")}</p>
+      <p className="mt-1 text-xs text-muted">{t("gov.act.appealBlurb")}</p>
+      <textarea
+        value={statement}
+        onChange={(e) => setStatement(e.target.value)}
+        disabled={busy}
+        maxLength={2000}
+        rows={3}
+        placeholder={t("gov.act.appealStatementPlaceholder")}
+        className="mt-2 w-full rounded-lg border border-themed bg-elev/40 px-3 py-2 text-sm placeholder:text-faint focus:border-beacon focus:outline-none disabled:opacity-50"
+      />
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={submit}
+          disabled={busy}
+          className="rounded-lg bg-beacon px-4 py-2 text-sm font-medium text-neutral-950 hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? t("gov.act.signing") : t("gov.act.appealSubmit")}
+        </button>
+        <button
+          onClick={() => setOpen(false)}
+          disabled={busy}
+          className="rounded-lg border border-themed px-4 py-2 text-sm font-medium text-muted hover:text-beacon disabled:opacity-50"
+        >
+          {t("gov.act.cancel")}
+        </button>
+      </div>
+      {err && <Note kind="err" text={err} />}
+      {ok && <Note kind="ok" text={ok} />}
+    </div>
+  );
+}
+
 export function VoteAction({ caseId }: { caseId: string }) {
   const { t } = useApp();
   const router = useRouter();
