@@ -231,9 +231,10 @@ model ProviderFlagCase {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  initiations ProviderFlagInitiation[]
-  votes       ProviderFlagVote[]
-  defense     ProviderFlagDefense?
+  initiations   ProviderFlagInitiation[]
+  votes         ProviderFlagVote[]
+  voteRevisions ProviderFlagVoteRevision[]
+  defense       ProviderFlagDefense?
 }
 
 // A Management Group member co-initiating a flag. Two distinct members open a case.
@@ -326,8 +327,27 @@ model ProviderFlagVote {
   vote              String
   comment           String?
   createdAt         DateTime         @default(now())
+  // Bumped whenever the member changes their vote; equals createdAt for a vote never changed.
+  updatedAt         DateTime         @default(now()) @updatedAt
 
   @@unique([caseId, memberEntityVoter])
+}
+
+// Append-only audit trail of every vote a member cast on a case, including changes. The current
+// vote lives on ProviderFlagVote (one row per member); this keeps the FULL public history so a
+// changed vote is transparent. One row per cast/change. Mirrors the grounds/defense revision pattern.
+model ProviderFlagVoteRevision {
+  id                String           @id @default(cuid())
+  case              ProviderFlagCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  caseId            String
+  memberEntityVoter String
+  signerAddress     String
+  // "DENY" | "KEEP"
+  vote              String
+  comment           String?
+  createdAt         DateTime         @default(now())
+
+  @@index([caseId, memberEntityVoter])
 }
 
 // The flagged provider's public defense statement, editable during the 14-day window.

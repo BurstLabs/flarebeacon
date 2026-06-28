@@ -380,7 +380,13 @@ export function VoteAction({ caseId }: { caseId: string }) {
       });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.voteFailed"));
-      setOk(t("gov.act.voteRecorded"));
+      setOk(
+        b.unchanged
+          ? t("gov.act.voteUnchanged")
+          : b.changed
+            ? t("gov.act.voteChangedOk")
+            : t("gov.act.voteRecorded")
+      );
       router.refresh();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("gov.act.err.voteFailed"));

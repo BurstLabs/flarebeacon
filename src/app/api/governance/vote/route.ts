@@ -57,8 +57,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  try {
-    await prisma.providerFlagVote.create({
+  // A member may change their vote while voting is open. The current choice is upserted onto
+  // ProviderFlagVote (one row per member, what the tally counts); every cast and change is also
+  // appended to ProviderFlagVoteRevision so the full history stays on the public record.
+  const existing = await prisma.providerFlagVote.findUnique({
+    where: { caseId_memberEntityVoter: { caseId, memberEntityVoter: memberVoter } },
+  });
+  const changed =
+    !existing || existing.vote !== vote || (existing.comment ?? null) !== (comment || null);
+
+  if (existing && !changed) {
+    // Re-submitting the identical vote+comment is a no-op; don't pad the history.
+    return NextResponse.json({ ok: true, unchanged: true });
+  }
+
+  await prisma.$transaction([
+    prisma.providerFlagVote.upsert({
+      where: { caseId_memberEntityVoter: { caseId, memberEntityVoter: memberVoter } },
+      create: {
+        caseId,
+        memberEntityVoter: memberVoter,
+        signerAddress: verified.address,
+        vote,
+        comment: comment || null,
+      },
+      update: {
+        signerAddress: verified.address,
+        vote,
+        comment: comment || null,
+      },
+    }),
+    prisma.providerFlagVoteRevision.create({
       data: {
         caseId,
         memberEntityVoter: memberVoter,
@@ -66,10 +95,8 @@ export async function POST(req: NextRequest) {
         vote,
         comment: comment || null,
       },
-    });
-  } catch {
-    return NextResponse.json({ error: "you have already voted on this case" }, { status: 409 });
-  }
+    }),
+  ]);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, changed: !!existing });
 }

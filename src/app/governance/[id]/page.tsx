@@ -31,6 +31,7 @@ export default async function GovernanceCasePage({
         },
       },
       votes: { orderBy: { createdAt: "asc" } },
+      voteRevisions: { orderBy: { createdAt: "asc" } },
       defense: {
         include: {
           revisions: { orderBy: { createdAt: "asc" } },
@@ -150,7 +151,22 @@ export default async function GovernanceCasePage({
       vote: v.vote,
       comment: v.comment,
       at: v.createdAt.toISOString(),
+      updatedAt: v.updatedAt.toISOString(),
+      // True when this member changed their vote at least once (current row was updated after it
+      // was first created). The full per-member trail is in voteHistory below.
+      changed: v.updatedAt.getTime() - v.createdAt.getTime() > 1000,
     })),
+    // Full append-only audit of every cast/change across all members, newest first.
+    voteHistory: c.voteRevisions
+      .slice()
+      .reverse()
+      .map((r) => ({
+        member: r.memberEntityVoter,
+        memberName: memberName(r.memberEntityVoter),
+        vote: r.vote,
+        comment: r.comment,
+        at: r.createdAt.toISOString(),
+      })),
     defense: c.defense
       ? {
           body: c.defense.body,
