@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { useApp } from "@/components/providers";
 import {
@@ -108,6 +108,52 @@ function relTime(d: string, now: number): string {
   const days = Math.round(h / 24);
   if (days < 7) return `${days}d ago`;
   return fmt(d);
+}
+
+// Live countdown to a FUTURE instant. Returns the two most-significant non-zero units
+// ("2d 4h", "3h 12m", "45m 9s", "8s") or null once the target has passed.
+function countdown(target: string, now: number): string | null {
+  let s = Math.floor((new Date(target).getTime() - now) / 1000);
+  if (s <= 0) return null;
+  const d = Math.floor(s / 86400);
+  s -= d * 86400;
+  const h = Math.floor(s / 3600);
+  s -= h * 3600;
+  const m = Math.floor(s / 60);
+  s -= m * 60;
+  const parts = [
+    ["d", d],
+    ["h", h],
+    ["m", m],
+    ["s", s],
+  ] as const;
+  // Show two units of granularity starting from the most significant non-zero one. There is always
+  // at least one non-zero unit here (we returned null above when no time remained).
+  const start = parts.findIndex(([, n]) => n > 0);
+  return parts
+    .slice(start, start + 2)
+    .map(([u, n]) => `${n}${u}`)
+    .join(" ");
+}
+
+// Renders a live countdown to a future time, or a "now" / past fallback label.
+function Countdown({
+  target,
+  now,
+  inLabel,
+  passedLabel,
+}: {
+  target: string;
+  now: number;
+  // Prefix for the remaining time, e.g. "in" -> "in 2d 4h".
+  inLabel: string;
+  // Shown once the target has passed (e.g. "voting has started" / "voting has ended").
+  passedLabel: string;
+}) {
+  const c = countdown(target, now);
+  return (
+    <span className="text-faint">{c ? `${inLabel} ${c}` : passedLabel}</span>
+  );
 }
 
 function RelTime({ at, now }: { at: string; now: number }) {
@@ -233,8 +279,13 @@ function outcomeLabel(t: T, state: string): { text: string; cls: string } {
 
 export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
   const { t } = useApp();
-  // Stable "now" for relative timestamps (set once on mount; avoids hydration mismatch).
-  const [now] = useState(() => Date.now());
+  // "now" seeds once on mount (avoids hydration mismatch), then ticks every second so the live
+  // countdowns to voting-start / voting-end stay current without a reload.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const idx = stageIndex(v.state);
   const isWithdrawn = v.state === "WITHDRAWN";
   // A withdrawn case is archived/read-only: treat it like a finished case for edit-gating.
@@ -330,8 +381,34 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
           {hasOpened && (
             <>
               <div>{t("gov.case.secondFlagRaised")} {fmt(v.openedAt)}</div>
-              <div>{t("gov.case.votingStarts")} {fmt(v.discussionEndsAt)}</div>
-              <div>{t("gov.case.votingEnds")} {fmt(v.votingEndsAt)}</div>
+              <div>
+                {t("gov.case.votingStarts")} {fmt(v.discussionEndsAt)}
+                {!decided && (
+                  <>
+                    {" "}&middot;{" "}
+                    <Countdown
+                      target={v.discussionEndsAt}
+                      now={now}
+                      inLabel={t("gov.case.countdownIn")}
+                      passedLabel={t("gov.case.votingStartedAlready")}
+                    />
+                  </>
+                )}
+              </div>
+              <div>
+                {t("gov.case.votingEnds")} {fmt(v.votingEndsAt)}
+                {!decided && (
+                  <>
+                    {" "}&middot;{" "}
+                    <Countdown
+                      target={v.votingEndsAt}
+                      now={now}
+                      inLabel={t("gov.case.countdownIn")}
+                      passedLabel={t("gov.case.votingEndedAlready")}
+                    />
+                  </>
+                )}
+              </div>
             </>
           )}
           {isWithdrawn ? (
