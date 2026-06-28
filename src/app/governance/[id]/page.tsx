@@ -51,9 +51,17 @@ export default async function GovernanceCasePage({
   } catch {
     // keep snapshot
   }
-  const votesCast = c.votes.length;
+  const votesCast = c.votes.length; // all present members, incl. abstentions (quorum)
   const denyVotes = c.votes.filter((v) => v.vote === "DENY").length;
-  const { turnoutFloor, denyNeeded } = evaluateOutcome(memberCount, votesCast, denyVotes);
+  const keepVotes = c.votes.filter((v) => v.vote === "KEEP").length;
+  const abstainVotes = c.votes.filter((v) => v.vote === "ABSTAIN").length;
+  const decisiveVotes = denyVotes + keepVotes; // excludes abstentions (deny majority)
+  const { turnoutFloor, denyNeeded } = evaluateOutcome(
+    memberCount,
+    votesCast,
+    denyVotes,
+    decisiveVotes
+  );
 
   const detailAddress =
     c.provider.addresses[0]?.address ?? "";
@@ -117,7 +125,9 @@ export default async function GovernanceCasePage({
     denyNeeded,
     votesCast,
     denyVotes,
-    keepVotes: votesCast - denyVotes,
+    keepVotes,
+    abstainVotes,
+    decisiveVotes,
     turnoutFloorBips: QUORUM_TURNOUT_BIPS,
     denyMajorityBips: DENY_MAJORITY_BIPS,
     initiations: c.initiations.map((i) => ({

@@ -34,6 +34,9 @@ export interface CaseView {
   votesCast: number;
   denyVotes: number;
   keepVotes: number;
+  abstainVotes: number;
+  // Deny + Keep (the deny-majority denominator); excludes abstentions.
+  decisiveVotes: number;
   turnoutFloorBips: number;
   denyMajorityBips: number;
   initiations: {
@@ -189,17 +192,16 @@ function MetBadge({ met, t }: { met: boolean; t: T }) {
   );
 }
 
-// DENY/KEEP pill, shared by the current-votes list and the vote-history trail.
+// DENY/KEEP/ABSTAIN pill, shared by the current-votes list and the vote-history trail.
 function VoteBadge({ vote, t }: { vote: string; t: T }) {
-  return (
-    <span
-      className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${
-        vote === "DENY" ? "bg-flare/20 text-flare" : "bg-emerald-500/20 text-emerald-400"
-      }`}
-    >
-      {vote === "DENY" ? t("gov.case.deny") : t("gov.case.keep")}
-    </span>
-  );
+  const cls =
+    vote === "DENY"
+      ? "bg-flare/20 text-flare"
+      : vote === "KEEP"
+        ? "bg-emerald-500/20 text-emerald-400"
+        : "bg-amber-500/20 text-amber-400";
+  const label = vote === "DENY" ? t("gov.case.deny") : vote === "KEEP" ? t("gov.case.keep") : t("gov.case.abstain");
+  return <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs ${cls}`}>{label}</span>;
 }
 
 function short(a: string): string {
@@ -467,7 +469,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
       {!isWithdrawn && (
       <div className="mt-6 surface rounded-xl border p-5">
         <h2 className="mb-3 text-lg font-semibold">{t("gov.case.voteTally")}</h2>
-        <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="grid grid-cols-4 gap-3 text-center">
           <div>
             <div className="text-2xl font-bold text-flare">{v.denyVotes}</div>
             <div className="text-xs text-faint">{t("gov.case.deny")}</div>
@@ -475,6 +477,10 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
           <div>
             <div className="text-2xl font-bold text-emerald-400">{v.keepVotes}</div>
             <div className="text-xs text-faint">{t("gov.case.keep")}</div>
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-amber-400">{v.abstainVotes}</div>
+            <div className="text-xs text-faint">{t("gov.case.abstain")}</div>
           </div>
           <div>
             <div className="text-2xl font-bold">{v.votesCast}</div>
@@ -499,6 +505,14 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
             })}
             <MetBadge met={denyMet} t={t} />
           </p>
+          {v.abstainVotes > 0 && (
+            <p className="text-xs text-faint">
+              {t("gov.case.abstainNote", {
+                abstainVotes: v.abstainVotes,
+                decisiveVotes: v.decisiveVotes,
+              })}
+            </p>
+          )}
         </div>
         {decided && (
           <p className={`mt-4 font-medium ${outcomeLabel(t, v.state).cls}`}>

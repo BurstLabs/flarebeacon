@@ -33,17 +33,24 @@ export type FlagState =
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Quorum evaluation for a tally. memberCount is the LIVE Management Group size at tally time. */
+// Quorum is measured against ALL votes cast (DENY + KEEP + ABSTAIN): an abstention is a present
+// member, so it counts toward turnout. The deny majority is measured only against the DECISIVE
+// votes (DENY + KEEP); an abstention is "present but not voting on the question", so it neither
+// helps nor hinders denial. This is what makes ABSTAIN a true neutral that cannot game quorum.
 export function evaluateOutcome(
   memberCount: number,
   votesCast: number,
-  denyVotes: number
+  denyVotes: number,
+  decisiveVotes: number = votesCast
 ): { decided: FlagState; turnoutFloor: number; denyNeeded: number } {
   const turnoutFloor = Math.ceil((QUORUM_TURNOUT_BIPS / 10000) * memberCount);
-  const denyNeeded = Math.ceil((DENY_MAJORITY_BIPS / 10000) * votesCast);
+  const denyNeeded = Math.ceil((DENY_MAJORITY_BIPS / 10000) * decisiveVotes);
   if (votesCast < turnoutFloor) {
     return { decided: "FAILED_QUORUM", turnoutFloor, denyNeeded };
   }
-  if (denyVotes >= denyNeeded) {
+  // With zero decisive votes (everyone abstained) denyNeeded is 0; an all-abstain quorate case is
+  // not a denial, so require at least one deny.
+  if (denyVotes >= denyNeeded && denyVotes > 0) {
     return { decided: "DENIED", turnoutFloor, denyNeeded };
   }
   return { decided: "CLEARED", turnoutFloor, denyNeeded };

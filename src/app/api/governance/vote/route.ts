@@ -14,13 +14,14 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const caseId = typeof body?.caseId === "string" ? body.caseId : null;
-  const vote = body?.vote === "DENY" || body?.vote === "KEEP" ? body.vote : null;
+  const vote =
+    body?.vote === "DENY" || body?.vote === "KEEP" || body?.vote === "ABSTAIN" ? body.vote : null;
   const message = typeof body?.message === "string" ? body.message : null;
   const signature = typeof body?.signature === "string" ? body.signature : null;
   const comment = typeof body?.comment === "string" ? body.comment.trim() : null;
   if (!caseId || !vote || !message || !signature) {
     return NextResponse.json(
-      { error: "caseId, vote (DENY|KEEP), message, and signature are required" },
+      { error: "caseId, vote (DENY|KEEP|ABSTAIN), message, and signature are required" },
       { status: 400 }
     );
   }

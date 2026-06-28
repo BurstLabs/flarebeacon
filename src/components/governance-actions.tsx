@@ -369,7 +369,7 @@ export function VoteAction({ caseId }: { caseId: string }) {
   // Optional public rationale that travels with the vote (signed, stored, versioned on changes).
   const [comment, setComment] = useState("");
 
-  async function cast(vote: "DENY" | "KEEP") {
+  async function cast(vote: "DENY" | "KEEP" | "ABSTAIN") {
     setErr("");
     setOk("");
     setBusy(vote);
@@ -431,7 +431,15 @@ export function VoteAction({ caseId }: { caseId: string }) {
         >
           {busy === "KEEP" ? t("gov.act.signing") : t("gov.act.voteKeep")}
         </button>
+        <button
+          onClick={() => cast("ABSTAIN")}
+          disabled={!!busy}
+          className="rounded-lg border border-amber-500 px-4 py-2 text-sm font-medium text-amber-500 hover:bg-amber-500/10 disabled:opacity-50"
+        >
+          {busy === "ABSTAIN" ? t("gov.act.signing") : t("gov.act.voteAbstain")}
+        </button>
       </div>
+      <p className="mt-2 text-xs text-faint">{t("gov.act.voteAbstainHint")}</p>
       {err && <Note kind="err" text={err} />}
       {ok && <Note kind="ok" text={ok} />}
     </div>

@@ -78,9 +78,11 @@ export async function POST(req: NextRequest) {
     for (const c of toTally) {
       // Only count votes from CURRENT members (dedup is already enforced per member entity).
       const validVotes = c.votes.filter((v) => members.memberAddresses.has(v.memberEntityVoter));
-      const votesCast = validVotes.length;
+      const votesCast = validVotes.length; // all present members, incl. abstentions (for quorum)
       const denyVotes = validVotes.filter((v) => v.vote === "DENY").length;
-      const { decided } = evaluateOutcome(members.memberCount, votesCast, denyVotes);
+      const keepVotes = validVotes.filter((v) => v.vote === "KEEP").length;
+      const decisiveVotes = denyVotes + keepVotes; // excludes abstentions (for the deny majority)
+      const { decided } = evaluateOutcome(members.memberCount, votesCast, denyVotes, decisiveVotes);
 
       await prisma.$transaction(async (tx) => {
         await tx.providerFlagCase.update({
