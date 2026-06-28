@@ -322,11 +322,11 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
               starts later, at openedAt, when a 2nd member opens the case, and only then are the
               discussion/voting deadlines real. Before opening (PENDING/WITHDRAWN) we suppress those
               forward dates to avoid implying a schedule that has not started. */}
-          <div>{t("gov.case.flagRaised")} {fmt(v.raisedAt)}</div>
+          <div>{t("gov.case.firstFlagRaised")} {fmt(v.raisedAt)}</div>
           {hasOpened && (
             <>
-              <div>{t("gov.case.discussionStarted")} {fmt(v.openedAt)}</div>
-              <div>{t("gov.case.discussionEnds")} {fmt(v.discussionEndsAt)}</div>
+              <div>{t("gov.case.secondFlagRaised")} {fmt(v.openedAt)}</div>
+              <div>{t("gov.case.votingStarts")} {fmt(v.discussionEndsAt)}</div>
               <div>{t("gov.case.votingEnds")} {fmt(v.votingEndsAt)}</div>
             </>
           )}
