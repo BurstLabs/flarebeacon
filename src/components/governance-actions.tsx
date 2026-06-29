@@ -1181,7 +1181,7 @@ export function ReplyAction({
         value={text}
         onChange={(e) => setText(e.target.value)}
         maxLength={4000}
-        rows={2}
+        rows={4}
         placeholder={t("gov.act.replyPlaceholder")}
         className="block w-full rounded border border-themed bg-elev px-3 py-2 text-sm"
       />

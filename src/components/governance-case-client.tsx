@@ -671,11 +671,11 @@ function PointNode({
         canAttach={canAttachImg}
         editor={p.editor}
       />
-      {/* Reply trigger and the collapse toggle sit on one row with a gap, so they never run together
-          ("ReplyShow 3 replies"). ReplyAction expands to a full editor below when opened. */}
-      <div className="flex flex-wrap items-center gap-x-4">
-        {canReply && <ReplyAction caseId={caseId} replyToRef={p.ref} />}
-        {replies.length > 0 && (
+      {/* ReplyAction is full-width (its open editor spans the point block). The collapse toggle is a
+          separate line below, so the two never run together ("ReplyShow 3 replies"). */}
+      {canReply && <ReplyAction caseId={caseId} replyToRef={p.ref} />}
+      {replies.length > 0 && (
+        <div>
           <button
             type="button"
             onClick={() => setShowReplies((s) => !s)}
@@ -685,8 +685,8 @@ function PointNode({
               ? t("gov.case.hideReplies")
               : t("gov.case.showReplies", { n: replyCount })}
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {replies.length > 0 && showReplies && (
         <ul
           className={`mt-2 space-y-3 border-l-2 pl-3 ${
