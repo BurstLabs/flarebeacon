@@ -1,6 +1,6 @@
 {
   "name": "Flare Registry FTSO Signal Providers",
-  "timestamp": "2026-06-29T02:49:14.592Z",
+  "timestamp": "2026-06-29T04:17:36.950Z",
   "version": {
     "major": 1,
     "minor": 3,
@@ -573,10 +573,10 @@
           "algorithm": "in-house"
         },
         "qualification": {
-          "qualifiedSince": null,
+          "qualifiedSince": "2026-06-29T04:17:36.245Z",
           "lastSubmittedEpoch": 409,
           "epochsSinceSubmit": 0,
-          "epochsUntilRevoke": null,
+          "epochsUntilRevoke": 17,
           "revokeAfterEpochs": 17
         },
         "governance": {
@@ -586,7 +586,7 @@
           "suspended": true,
           "appealReady": false,
           "caseId": "cmqyhu8m100034mxmpfiexpo9",
-          "state": "OPEN_VOTING"
+          "state": "OPEN_DISCUSSION"
         }
       }
     },
@@ -4076,10 +4076,10 @@
           "algorithm": "in-house"
         },
         "qualification": {
-          "qualifiedSince": null,
+          "qualifiedSince": "2026-06-29T04:17:36.245Z",
           "lastSubmittedEpoch": 409,
           "epochsSinceSubmit": 0,
-          "epochsUntilRevoke": null,
+          "epochsUntilRevoke": 17,
           "revokeAfterEpochs": 17
         },
         "governance": {
@@ -4089,7 +4089,7 @@
           "suspended": true,
           "appealReady": false,
           "caseId": "cmqyhu8m100034mxmpfiexpo9",
-          "state": "OPEN_VOTING"
+          "state": "OPEN_DISCUSSION"
         }
       }
     },
