@@ -776,8 +776,9 @@ export function PointImages({
       fd.append("file", file);
       fd.append("ownerType", ownerType);
       fd.append("ownerId", ownerId);
-      fd.append("message", s.message);
-      fd.append("signature", s.signature);
+      // Base64-encode the signed SIWE message + signature so multipart newline normalization can't
+      // corrupt the strictly-formatted message (which would fail to parse server-side).
+      fd.append("auth", btoa(JSON.stringify({ message: s.message, signature: s.signature })));
       const res = await fetch("/api/governance/point-image", { method: "POST", body: fd });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.imageFailed"));

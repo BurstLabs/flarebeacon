@@ -27,12 +27,23 @@ export async function POST(req: NextRequest) {
   const file = form.get("file");
   const ownerType = String(form.get("ownerType") ?? "");
   const ownerId = String(form.get("ownerId") ?? "");
-  const message = String(form.get("message") ?? "");
-  const signature = String(form.get("signature") ?? "");
+  // The SIWE message + signature travel as a base64-encoded JSON field, NOT as raw multipart fields:
+  // multipart encoders normalize newlines (\n -> \r\n), which corrupts the strictly-formatted SIWE
+  // message and makes it fail to parse ("malformed message"). Base64 round-trips it byte-exact.
+  let message = "";
+  let signature = "";
+  try {
+    const authB64 = String(form.get("auth") ?? "");
+    const decoded = JSON.parse(Buffer.from(authB64, "base64").toString("utf8"));
+    message = typeof decoded?.message === "string" ? decoded.message : "";
+    signature = typeof decoded?.signature === "string" ? decoded.signature : "";
+  } catch {
+    // leave empty -> validation below returns 400
+  }
 
   if (!(file instanceof Blob) || !ownerType || !ownerId || !message || !signature) {
     return NextResponse.json(
-      { error: "file, ownerType, ownerId, message, and signature are required" },
+      { error: "file, ownerType, ownerId, and a signed auth payload are required" },
       { status: 400 }
     );
   }
