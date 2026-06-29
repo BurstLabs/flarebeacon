@@ -594,8 +594,16 @@ interface PointVM {
   editor?: (close: () => void) => ReactNode;
 }
 
+// Total number of replies threaded under a point (all descendants, recursively), so the collapse
+// toggle can show how many are hidden.
+function countDescendants(ref: string, childrenByRef: Map<string, PointVM[]>): number {
+  const kids = childrenByRef.get(ref) ?? [];
+  return kids.reduce((n, k) => n + 1 + countDescendants(k.ref, childrenByRef), 0);
+}
+
 // Renders one point and, recursively, every reply threaded beneath it. A reply is indented and
 // labelled with who it answers; the author's role tints the thread border (provider vs member).
+// Reply threads are COLLAPSED by default to keep a long back-and-forth tidy; a toggle expands them.
 function PointNode({
   p,
   num,
@@ -622,6 +630,9 @@ function PointNode({
   const replies = childrenByRef.get(p.ref) ?? [];
   const isReply = !!p.replyToRef;
   const replyingToWho = isReply ? labelByRef.get(p.replyToRef!) : null;
+  // Reply threads start collapsed; the toggle counts every descendant so it reads "Show N replies".
+  const [showReplies, setShowReplies] = useState(false);
+  const replyCount = replies.length > 0 ? countDescendants(p.ref, childrenByRef) : 0;
   return (
     <li>
       {/* A reply carries its own author line (role badge + who) — top-level points get their author
@@ -662,27 +673,39 @@ function PointNode({
       />
       {canReply && <ReplyAction caseId={caseId} replyToRef={p.ref} />}
       {replies.length > 0 && (
-        <ul
-          className={`mt-2 space-y-3 border-l-2 pl-3 ${
-            // Tint the nested thread by the FIRST reply's author so a provider answer reads distinctly.
-            replies[0].role === "provider" ? "border-flare/30" : "border-beacon/30"
-          }`}
-        >
-          {replies.map((r) => (
-            <PointNode
-              key={r.id}
-              p={r}
-              num={null}
-              childrenByRef={childrenByRef}
-              labelByRef={labelByRef}
-              caseId={caseId}
-              canReply={canReply}
-              canAttachImg={canAttachImg}
-              now={now}
-              t={t}
-            />
-          ))}
-        </ul>
+        <>
+          <button
+            onClick={() => setShowReplies((s) => !s)}
+            className="mt-1 text-xs font-medium text-muted hover:text-beacon"
+          >
+            {showReplies
+              ? t("gov.case.hideReplies")
+              : t("gov.case.showReplies", { n: replyCount })}
+          </button>
+          {showReplies && (
+            <ul
+              className={`mt-2 space-y-3 border-l-2 pl-3 ${
+                // Tint the nested thread by the FIRST reply's author so a provider answer reads distinctly.
+                replies[0].role === "provider" ? "border-flare/30" : "border-beacon/30"
+              }`}
+            >
+              {replies.map((r) => (
+                <PointNode
+                  key={r.id}
+                  p={r}
+                  num={null}
+                  childrenByRef={childrenByRef}
+                  labelByRef={labelByRef}
+                  caseId={caseId}
+                  canReply={canReply}
+                  canAttachImg={canAttachImg}
+                  now={now}
+                  t={t}
+                />
+              ))}
+            </ul>
+          )}
+        </>
       )}
     </li>
   );
