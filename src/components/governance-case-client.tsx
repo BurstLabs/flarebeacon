@@ -945,166 +945,154 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         </div>
       </div>
 
-      {/* Live tally vs quorum. Shown ONLY while voting is open or once decided (final numbers +
-          outcome). Hidden during PENDING and the discussion period (no votes, no schedule yet) and
-          for a withdrawn case, where an empty "0 of N, quorum not met" tally would imply a vote that
-          has not started. This applies identically to flag cases AND appeals (state-based). */}
-      {showTally && (
-      <div className="mt-6 surface rounded-xl border p-5">
-        <h2 className="mb-3 text-lg font-semibold">{t("gov.case.voteTally")}</h2>
-        <div className="grid grid-cols-4 gap-3 text-center">
-          <div>
-            <div className="text-2xl font-bold text-flare">{v.denyVotes}</div>
-            <div className="text-xs text-faint">{t("gov.case.deny")}</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-emerald-400">{v.keepVotes}</div>
-            <div className="text-xs text-faint">{t("gov.case.keep")}</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-amber-400">{v.abstainVotes}</div>
-            <div className="text-xs text-faint">{t("gov.case.abstain")}</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold">{v.votesCast}</div>
-            <div className="text-xs text-faint">{t("gov.case.totalCast")}</div>
-          </div>
-        </div>
-        <div className="mt-4 space-y-1 text-sm text-muted">
-          <p>
-            {t("gov.case.quorumLine", {
-              votesCast: v.votesCast,
-              turnoutFloor: v.turnoutFloor,
-              pct: Math.round(v.turnoutFloorBips / 100),
-              memberCount: v.memberCount,
-            })}
-            <MetBadge met={quorumMet} t={t} />
-          </p>
-          {/* For an appeal, show BOTH sides: the appellant needs a keep result to overturn the
-              denial, and the deny side is what would reject the appeal. The keep side is "met" only on
-              an affirmative keep supermajority (the same 67%-of-decisive bar as deny) - a split or
-              all-abstain vote does NOT uphold the appeal. For a flag case, only the single deny line is
-              shown (a deny supermajority suspends). */}
-          {v.isReVote && (
-            <p>
-              {t("gov.case.keepLine", {
-                keepVotes: v.keepVotes,
-                // Keep needed = the 67%-of-decisive supermajority bar (at least 1), mirroring deny.
-                keepNeeded: Math.max(1, v.denyNeeded),
-              })}
-              <MetBadge met={keepMet} t={t} />
-            </p>
-          )}
-          <p>
-            {t(v.isReVote ? "gov.case.rejectLine" : "gov.case.denyLine", {
-              denyVotes: v.denyVotes,
-              denyNeeded: v.denyNeeded,
-              pct: Math.round(v.denyMajorityBips / 100),
-            })}
-            <MetBadge met={denyMet} t={t} />
-          </p>
-          {v.abstainVotes > 0 && (
-            <p className="text-xs text-faint">
-              {t("gov.case.abstainNote", {
-                abstainVotes: v.abstainVotes,
-                decisiveVotes: v.decisiveVotes,
-              })}
-            </p>
-          )}
-        </div>
-        {/* Resolved state gets its own status box, consistent with the discussion/voting banners. A
-            positive outcome (cleared / appeal upheld) is tinted green; a negative one (denied /
-            appeal rejected or failed for quorum) is tinted with the flare accent. */}
-        {decided && (() => {
-          const o = outcomeLabel(t, v.state, v.isReVote);
-          const positive = o.cls.includes("emerald");
-          return (
-            <div
-              className={`mt-4 rounded-lg border p-3 text-sm ${
-                positive
-                  ? "border-emerald-500/40 bg-emerald-500/10"
-                  : "border-flare/40 bg-flare/10"
-              }`}
-            >
-              <p className="text-xs uppercase tracking-wide text-faint">
-                {t("gov.case.statusResolved")}
+      {/* Status box: explains the current stage (discussion / voting / resolved) independent of the
+          numeric tally. PENDING has its own banner + withdraw action above; a withdrawn case has its
+          archived notice above. State-based, so it reads correctly for flag cases and appeals. The
+          box is suppressed when there is nothing to say (PENDING / withdrawn). */}
+      {!isWithdrawn && !isPending && (
+        <div className="mt-6 surface rounded-xl border p-5">
+          {/* During discussion, say so plainly and show when voting opens. No votes can be cast yet. */}
+          {v.state === "OPEN_DISCUSSION" && (
+            <div className="rounded-lg border border-themed bg-elev/40 p-3 text-sm">
+              <p className="text-xs uppercase tracking-wide text-faint">{t("gov.case.statusDiscussion")}</p>
+              <p className="mt-0.5 font-medium">
+                {t("gov.case.inDiscussion")}{" "}
+                <Countdown
+                  target={v.discussionEndsAt}
+                  now={now}
+                  inLabel={t("gov.case.votingOpensIn")}
+                  passedLabel={t("gov.case.votingOpensSoon")}
+                />
               </p>
-              <p className={`mt-0.5 font-medium ${o.cls}`}>
-                {t("gov.case.outcomePrefix")} {o.text}
-              </p>
-            </div>
-          );
-        })()}
-        {/* What happens next for a denied provider on the ORIGINAL flag case: the appeal process. */}
-        {v.appeal && (
-          <AppealPanel providerId={v.providerId} appeal={v.appeal} now={now} t={t} />
-        )}
-        {/* On a DENIED appeal case itself, there is no further appeal: state plainly that the one
-            permitted appeal was heard and denied, so the suspension is now final. */}
-        {v.isReVote && v.state === "DENIED" && (
-          <div className="mt-4 rounded-lg border border-flare/40 bg-flare/10 p-4 text-sm">
-            <p className="font-medium text-flare">{t("gov.case.appealDeniedFinalTitle")}</p>
-            <p className="mt-1 text-muted">{t("gov.case.appealDeniedFinalBody")}</p>
-          </div>
-        )}
-        {/* During discussion, say so plainly and show when voting opens. Voting has not started yet,
-            so no votes can be cast. */}
-        {v.state === "OPEN_DISCUSSION" && (
-          <div className="mt-4 rounded-lg border border-themed bg-elev/40 p-3 text-sm">
-            <p className="font-medium">
-              {t("gov.case.inDiscussion")}{" "}
-              <Countdown
-                target={v.discussionEndsAt}
-                now={now}
-                inLabel={t("gov.case.votingOpensIn")}
-                passedLabel={t("gov.case.votingOpensSoon")}
-              />
-            </p>
-            <p className="mt-1 text-xs text-muted">{t("gov.case.inDiscussionBody")}</p>
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-300">
-              {t("gov.case.providerResponsibility")}
-            </p>
-          </div>
-        )}
-        {/* While voting is open, make the waiting state explicit: the case is NOT decided yet and
-            stays open for the full voting period, even once the thresholds are already met. */}
-        {v.state === "OPEN_VOTING" && (
-          <div className="mt-4 rounded-lg border border-themed bg-elev/40 p-3 text-sm">
-            <p className="font-medium">
-              {t("gov.case.awaitingVoteEnd")}{" "}
-              <Countdown
-                target={v.votingEndsAt}
-                now={now}
-                inLabel={t("gov.case.countdownIn")}
-                passedLabel={t("gov.case.votingEndedAlready")}
-              />
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              {v.isReVote
-                ? // Appeal: upheld only on an affirmative keep supermajority; otherwise (with quorum)
-                  // it is rejected; without quorum it fails for lack of quorum.
-                  quorumMet && keepMet
-                  ? t("gov.case.provisionalClearAppeal")
-                  : quorumMet
-                    ? t("gov.case.provisionalDenyAppeal")
-                    : t("gov.case.provisionalQuorumAppeal")
-                : // Flag: suspended only on a deny supermajority; otherwise cleared; else fails quorum.
-                  quorumMet && denyMet
-                  ? t("gov.case.provisionalDeny")
-                  : quorumMet && !denyMet
-                    ? t("gov.case.provisionalClear")
-                    : t("gov.case.provisionalQuorum")}
-            </p>
-            {/* Only relevant while quorum is still short: the provider must rally the votes. */}
-            {!quorumMet && (
+              <p className="mt-1 text-xs text-muted">{t("gov.case.inDiscussionBody")}</p>
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-300">
                 {t("gov.case.providerResponsibility")}
               </p>
-            )}
-          </div>
-        )}
-        {v.state === "OPEN_VOTING" && <VoteAction caseId={v.id} />}
-      </div>
+            </div>
+          )}
+          {/* While voting is open, make the waiting state explicit: not decided until voting ends. */}
+          {v.state === "OPEN_VOTING" && (
+            <div className="rounded-lg border border-themed bg-elev/40 p-3 text-sm">
+              <p className="text-xs uppercase tracking-wide text-faint">{t("gov.case.statusVoting")}</p>
+              <p className="mt-0.5 font-medium">
+                {t("gov.case.awaitingVoteEnd")}{" "}
+                <Countdown
+                  target={v.votingEndsAt}
+                  now={now}
+                  inLabel={t("gov.case.countdownIn")}
+                  passedLabel={t("gov.case.votingEndedAlready")}
+                />
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                {v.isReVote
+                  ? quorumMet && keepMet
+                    ? t("gov.case.provisionalClearAppeal")
+                    : quorumMet
+                      ? t("gov.case.provisionalDenyAppeal")
+                      : t("gov.case.provisionalQuorumAppeal")
+                  : quorumMet && denyMet
+                    ? t("gov.case.provisionalDeny")
+                    : quorumMet && !denyMet
+                      ? t("gov.case.provisionalClear")
+                      : t("gov.case.provisionalQuorum")}
+              </p>
+              {!quorumMet && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-300">
+                  {t("gov.case.providerResponsibility")}
+                </p>
+              )}
+            </div>
+          )}
+          {/* Resolved: the final outcome, tinted by result. */}
+          {decided && (() => {
+            const o = outcomeLabel(t, v.state, v.isReVote);
+            const positive = o.cls.includes("emerald");
+            return (
+              <div
+                className={`rounded-lg border p-3 text-sm ${
+                  positive ? "border-emerald-500/40 bg-emerald-500/10" : "border-flare/40 bg-flare/10"
+                }`}
+              >
+                <p className="text-xs uppercase tracking-wide text-faint">{t("gov.case.statusResolved")}</p>
+                <p className={`mt-0.5 font-medium ${o.cls}`}>
+                  {t("gov.case.outcomePrefix")} {o.text}
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* The numeric tally + thresholds only matter once voting is open or the case is decided. */}
+          {showTally && (
+            <>
+              <h2 className="mt-5 mb-3 text-lg font-semibold">{t("gov.case.voteTally")}</h2>
+              <div className="grid grid-cols-4 gap-3 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-flare">{v.denyVotes}</div>
+                  <div className="text-xs text-faint">{t("gov.case.deny")}</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-emerald-400">{v.keepVotes}</div>
+                  <div className="text-xs text-faint">{t("gov.case.keep")}</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-400">{v.abstainVotes}</div>
+                  <div className="text-xs text-faint">{t("gov.case.abstain")}</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{v.votesCast}</div>
+                  <div className="text-xs text-faint">{t("gov.case.totalCast")}</div>
+                </div>
+              </div>
+              <div className="mt-4 space-y-1 text-sm text-muted">
+                <p>
+                  {t("gov.case.quorumLine", {
+                    votesCast: v.votesCast,
+                    turnoutFloor: v.turnoutFloor,
+                    pct: Math.round(v.turnoutFloorBips / 100),
+                    memberCount: v.memberCount,
+                  })}
+                  <MetBadge met={quorumMet} t={t} />
+                </p>
+                {v.isReVote && (
+                  <p>
+                    {t("gov.case.keepLine", {
+                      keepVotes: v.keepVotes,
+                      keepNeeded: Math.max(1, v.denyNeeded),
+                    })}
+                    <MetBadge met={keepMet} t={t} />
+                  </p>
+                )}
+                <p>
+                  {t(v.isReVote ? "gov.case.rejectLine" : "gov.case.denyLine", {
+                    denyVotes: v.denyVotes,
+                    denyNeeded: v.denyNeeded,
+                    pct: Math.round(v.denyMajorityBips / 100),
+                  })}
+                  <MetBadge met={denyMet} t={t} />
+                </p>
+                {v.abstainVotes > 0 && (
+                  <p className="text-xs text-faint">
+                    {t("gov.case.abstainNote", {
+                      abstainVotes: v.abstainVotes,
+                      decisiveVotes: v.decisiveVotes,
+                    })}
+                  </p>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* What happens next for a denied provider on the ORIGINAL flag case: the appeal process. */}
+          {v.appeal && <AppealPanel providerId={v.providerId} appeal={v.appeal} now={now} t={t} />}
+          {/* On a DENIED appeal case itself, there is no further appeal. */}
+          {v.isReVote && v.state === "DENIED" && (
+            <div className="mt-4 rounded-lg border border-flare/40 bg-flare/10 p-4 text-sm">
+              <p className="font-medium text-flare">{t("gov.case.appealDeniedFinalTitle")}</p>
+              <p className="mt-1 text-muted">{t("gov.case.appealDeniedFinalBody")}</p>
+            </div>
+          )}
+          {v.state === "OPEN_VOTING" && <VoteAction caseId={v.id} />}
+        </div>
       )}
 
       {/* Votes on the record sit directly under the tally (same topic: the tally is the summary, this
