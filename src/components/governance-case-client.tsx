@@ -564,7 +564,8 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
   const denyMet = v.denyVotes >= v.denyNeeded;
 
   const STAGES = [
-    t("gov.case.stage.flagged"),
+    // An appeal is filed by the provider, not "flagged" by members.
+    v.isReVote ? t("gov.case.stage.filed") : t("gov.case.stage.flagged"),
     t("gov.case.stage.discussion"),
     t("gov.case.stage.voting"),
     t("gov.case.stage.decided"),
@@ -654,10 +655,18 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
               starts later, at openedAt, when a 2nd member opens the case, and only then are the
               discussion/voting deadlines real. Before opening (PENDING/WITHDRAWN) we suppress those
               forward dates to avoid implying a schedule that has not started. */}
-          <div>{t("gov.case.firstFlagRaised")} {fmt(v.raisedAt)}</div>
+          {/* An appeal is opened by the provider in one act (no co-initiators), so show a single
+              "Appeal filed" line; a flag case shows the first/second flag-raised co-initiations. */}
+          {v.isReVote ? (
+            <div>{t("gov.case.appealFiled")} {fmt(v.openedAt)}</div>
+          ) : (
+            <div>{t("gov.case.firstFlagRaised")} {fmt(v.raisedAt)}</div>
+          )}
           {hasOpened && (
             <>
-              <div>{t("gov.case.secondFlagRaised")} {fmt(v.openedAt)}</div>
+              {!v.isReVote && (
+                <div>{t("gov.case.secondFlagRaised")} {fmt(v.openedAt)}</div>
+              )}
               <div>
                 {t("gov.case.votingStarts")} {fmt(v.discussionEndsAt)}
                 {!decided && (
@@ -813,8 +822,12 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
       {/* Grounds from co-initiators. Each member's points render as one uniform list; each point can
           be edited inline (signature-gated), and a single "add another" sits at the bottom. */}
       <div className="mt-6 surface rounded-xl border p-5">
-        <h2 className="text-lg font-semibold">{t("gov.case.whyFlagged")}</h2>
-        <p className="mt-1 mb-4 text-xs text-muted">{t("gov.case.whyFlaggedHelp")}</p>
+        <h2 className="text-lg font-semibold">
+          {v.isReVote ? t("gov.case.appealGrounds") : t("gov.case.whyFlagged")}
+        </h2>
+        <p className="mt-1 mb-4 text-xs text-muted">
+          {v.isReVote ? t("gov.case.appealGroundsHelp") : t("gov.case.whyFlaggedHelp")}
+        </p>
         {v.initiations.length === 0 ? (
           <p className="text-sm text-muted">{t("gov.case.noGrounds")}</p>
         ) : null}
