@@ -697,7 +697,8 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         <p className="mt-1 mb-4 text-xs text-muted">{t("gov.case.whyFlaggedHelp")}</p>
         {v.initiations.length === 0 ? (
           <p className="text-sm text-muted">{t("gov.case.noGrounds")}</p>
-        ) : (
+        ) : null}
+        {v.initiations.length > 0 && (
           <ul className="space-y-6">
             {v.initiations.map((i, n) => {
               const preVote = v.state === "PENDING" || v.state === "OPEN_DISCUSSION";
@@ -772,6 +773,15 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
               );
             })}
           </ul>
+        )}
+        {/* Any Management Group member may open their own grounds while the case is pre-vote. This is
+            the only way to record grounds on a provider-initiated appeal (no co-initiations exist),
+            and lets a member who has not yet weighed in add their points to any open case. The action
+            is member-gated server-side; ownerVoter is empty so the server uses the signer. */}
+        {v.state === "OPEN_DISCUSSION" && (
+          <div className="mt-4 border-t border-themed pt-3">
+            <AddGroundsAction caseId={v.id} ownerVoter="" label={t("gov.act.openGrounds")} />
+          </div>
         )}
       </div>
 

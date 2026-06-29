@@ -81,11 +81,34 @@ export async function POST(req: NextRequest) {
   }
 
   const mine = theCase.initiations.find((i) => i.memberEntityVoter === memberVoter);
+
+  // No initiation yet: a member adding grounds to an OPEN case (notably a provider-initiated appeal,
+  // which has no co-initiations) opens their own grounds. The primary grounds + first revision are
+  // created here so members can record their points in an appeal's discussion stage. This does not
+  // change quorum or voting; it is the member's evidence on the record.
   if (!mine) {
-    return NextResponse.json(
-      { error: "you have not flagged this provider, so you cannot add grounds" },
-      { status: 403 }
-    );
+    // Only on an already-OPEN case. On a PENDING case, co-initiation still runs through the flag
+    // route's counting (so the case opens properly); we must not create a second initiation here and
+    // bypass that gate.
+    if (theCase.state !== "OPEN_DISCUSSION") {
+      return NextResponse.json(
+        { error: "you have not flagged this provider, so you cannot add grounds yet" },
+        { status: 403 }
+      );
+    }
+    if (ownerVoter && ownerVoter !== memberVoter) {
+      return NextResponse.json(
+        { error: "you can only add a point to your own grounds" },
+        { status: 403 }
+      );
+    }
+    const initiation = await prisma.providerFlagInitiation.create({
+      data: { caseId, memberEntityVoter: memberVoter, signerAddress: verified.address!, grounds, title },
+    });
+    await prisma.providerFlagGroundsRevision.create({
+      data: { initiationId: initiation.id, grounds, title, signerAddress: verified.address! },
+    });
+    return NextResponse.json({ ok: true, initiationId: initiation.id, created: true });
   }
 
   const entry = await prisma.providerFlagGroundsEntry.create({

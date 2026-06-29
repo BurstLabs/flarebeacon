@@ -284,7 +284,17 @@ export function EditGroundsAction({
 
 // Add-grounds panel, shown on a pre-vote case page. The flagging member can add a SUPPLEMENTAL
 // grounds entry (extra evidence/notes). Informational only; signature-gated server-side.
-export function AddGroundsAction({ caseId, ownerVoter }: { caseId: string; ownerVoter: string }) {
+export function AddGroundsAction({
+  caseId,
+  ownerVoter,
+  label,
+}: {
+  caseId: string;
+  // The member whose grounds this point is added to. Empty string means "open my own grounds" (the
+  // server resolves the owner from the signature) — used by members adding points to an appeal.
+  ownerVoter: string;
+  label?: string;
+}) {
   const { t } = useApp();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -307,7 +317,7 @@ export function AddGroundsAction({ caseId, ownerVoter }: { caseId: string; owner
       const res = await fetch("/api/governance/add-grounds", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ caseId, ownerVoter, grounds, title, message: s.message, signature: s.signature }),
+        body: JSON.stringify({ caseId, ownerVoter: ownerVoter || undefined, grounds, title, message: s.message, signature: s.signature }),
       });
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.addFailed"));
@@ -329,7 +339,7 @@ export function AddGroundsAction({ caseId, ownerVoter }: { caseId: string; owner
         onClick={() => setOpen((o) => !o)}
         className="text-sm font-medium text-muted hover:text-beacon"
       >
-        {t("gov.act.addToggle")} {open ? "−" : "+"}
+        {label ?? t("gov.act.addToggle")} {open ? "−" : "+"}
       </button>
       {open && (
         <div className="mt-3">
