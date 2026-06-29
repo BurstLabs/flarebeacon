@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { LOCALES, type Locale, translate } from "@/lib/i18n";
 
 type Theme = "dark" | "light";
@@ -60,6 +61,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
     (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars),
     [locale]
   );
+
+  // First-party, cookieless page-view tracking for the admin statistics. Pings /api/track on every
+  // route change. Best-effort and silent; never blocks or surfaces errors. The admin dashboard is
+  // excluded so operator activity does not inflate the public traffic numbers.
+  const pathname = usePathname();
+  useEffect(() => {
+    if (!pathname || pathname.startsWith("/admin")) return;
+    fetch("/api/track", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ path: pathname }),
+      keepalive: true,
+    }).catch(() => {});
+  }, [pathname]);
 
   return (
     <AppContext.Provider value={{ theme, setTheme, toggleTheme, locale, setLocale, t }}>

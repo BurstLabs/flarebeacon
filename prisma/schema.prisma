@@ -453,3 +453,20 @@ model ProviderFlagPointImage {
   @@index([defenseId])
   @@index([defenseEntryId])
 }
+
+// Lightweight first-party traffic counter for the admin statistics. One row per (day, path), with a
+// hit count and an approximate unique-visitor count. No cookies, no IPs stored: uniqueness is a
+// best-effort daily salted hash kept only as a count, so this holds no personal data. Populated by
+// POST /api/track from the client on navigation; read by the admin stats endpoint.
+model PageView {
+  id      String   @id @default(cuid())
+  day     String // YYYY-MM-DD (UTC)
+  path    String // normalized pathname, e.g. "/", "/provider/[address]"
+  hits    Int      @default(0)
+  uniques Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([day, path])
+  @@index([day])
+}
+
