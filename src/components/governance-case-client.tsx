@@ -442,6 +442,10 @@ function EntryBlock({
         };
         const items: Item[] = [];
         const usedBuckets = new Set<string>();
+        // The CURRENT version's save bucket (latest edit, or original post). priorVersions excludes
+        // it. Images ADDED in that save are the thumbnails shown above (no history line needed), but
+        // images REMOVED in that save leave no thumbnail, so they still need a history record.
+        const currentBucket = sec(editedAt ?? at);
         priorVersions.forEach((r, i) => {
           const b = sec(r.at);
           usedBuckets.add(b);
@@ -455,16 +459,21 @@ function EntryBlock({
             removed: sameSave.reduce((s, e) => s + e.rem, 0),
           });
         });
-        // Image-only saves (no text revision in that bucket): one entry per bucket.
+        // Image-only saves (no text revision in that bucket): one entry per bucket. For the current
+        // version's bucket, suppress ADDs (already shown as thumbnails) but keep REMOVEs.
         const standalone = new Map<string, { at: string; added: number; removed: number }>();
         for (const e of imgEvents) {
-          if (usedBuckets.has(e.bucket)) continue;
+          if (usedBuckets.has(e.bucket)) continue; // already merged into a prior text revision
+          const isCurrent = e.bucket === currentBucket;
+          const add = isCurrent ? 0 : e.add; // current adds are the visible thumbnails
+          if (add === 0 && e.rem === 0) continue;
           const cur = standalone.get(e.bucket) ?? { at: e.at, added: 0, removed: 0 };
-          cur.added += e.add;
+          cur.added += add;
           cur.removed += e.rem;
           standalone.set(e.bucket, cur);
         }
         for (const s of standalone.values()) {
+          if (s.added === 0 && s.removed === 0) continue;
           items.push({ at: s.at, kind: "image", added: s.added, removed: s.removed });
         }
         if (items.length === 0) return null;
