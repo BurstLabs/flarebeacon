@@ -435,6 +435,9 @@ model ProviderFlagPointImage {
   bytes         Int
   signerAddress String
   createdAt     DateTime @default(now())
+  // When the author removed the image. The file bytes are discarded on removal, but the row stays so
+  // the public record shows an image was attached then removed (and when). Null = still attached.
+  removedAt     DateTime?
 
   @@index([caseId])
   @@index([initiationId])

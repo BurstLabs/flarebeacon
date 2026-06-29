@@ -141,9 +141,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Enforce the per-point image cap.
+  // Enforce the per-point image cap. Removed images don't count (they freed their slot).
   const count = await prisma.providerFlagPointImage.count({
-    where: { [ownerColumn[ownerType]]: ownerId },
+    where: { [ownerColumn[ownerType]]: ownerId, removedAt: null },
   });
   if (count >= IMAGE_MAX_PER_POINT) {
     return NextResponse.json(

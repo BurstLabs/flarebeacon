@@ -124,7 +124,9 @@ export async function storePointImageBatch(opts: {
   const { prisma, randomUUID, caseId, ownerColumn, ownerId, signerAddress, files } = opts;
   if (files.length === 0) return 0;
   // Respect the per-point cap (a fresh point starts at 0, but guard anyway).
-  const existing = await prisma.providerFlagPointImage.count({ where: { [ownerColumn]: ownerId } });
+  const existing = await prisma.providerFlagPointImage.count({
+    where: { [ownerColumn]: ownerId, removedAt: null },
+  });
   const room = Math.max(0, IMAGE_MAX_PER_POINT - existing);
   let saved = 0;
   for (const buf of files.slice(0, room)) {

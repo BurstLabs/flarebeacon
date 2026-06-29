@@ -10,6 +10,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const img = await prisma.providerFlagPointImage.findUnique({ where: { id } });
   if (!img) return NextResponse.json({ error: "not found" }, { status: 404 });
+  // A removed image's bytes are discarded; the row remains only for the history record.
+  if (img.removedAt) return NextResponse.json({ error: "image removed" }, { status: 410 });
   const buf = await readPointImage(img.caseId, img.id, img.ext);
   if (!buf) return NextResponse.json({ error: "not found" }, { status: 404 });
   return new NextResponse(new Uint8Array(buf), {
@@ -90,7 +92,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ error: "only the author can remove this image" }, { status: 403 });
   }
 
-  await prisma.providerFlagPointImage.delete({ where: { id } });
-  await deletePointImageFile(img.caseId, img.id, img.ext);
+  // Soft-delete: keep the row (so the public record shows it was attached then removed) but discard
+  // the file bytes. A second removal is a no-op.
+  if (!img.removedAt) {
+    await prisma.providerFlagPointImage.update({
+      where: { id },
+      data: { removedAt: new Date() },
+    });
+    await deletePointImageFile(img.caseId, img.id, img.ext);
+  }
   return NextResponse.json({ ok: true });
 }

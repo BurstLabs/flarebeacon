@@ -108,11 +108,14 @@ export interface CaseView {
   } | null;
 }
 
-// An evidence image on a point; served from /api/governance/image/<id>.
+// An evidence image on a point; served from /api/governance/image/<id>. A removed image keeps its
+// row (removedAt set) for the public record; its bytes are gone, so it shows only in history.
 export interface PointImage {
   id: string;
   width: number;
   height: number;
+  at: string;
+  removedAt: string | null;
 }
 
 type T = (key: string, vars?: Record<string, string | number>) => string;

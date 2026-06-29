@@ -873,7 +873,7 @@ export function PointImages({
   canAttach,
   t,
 }: {
-  images: { id: string; width: number; height: number }[];
+  images: { id: string; width: number; height: number; at: string; removedAt: string | null }[];
   ownerType: "initiation" | "groundsEntry" | "defense" | "defenseEntry";
   ownerId: string;
   canAttach: boolean;
@@ -883,6 +883,8 @@ export function PointImages({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const active = images.filter((i) => !i.removedAt);
+  const removed = images.filter((i) => i.removedAt);
 
   async function upload(file: File) {
     setErr("");
@@ -928,13 +930,13 @@ export function PointImages({
     }
   }
 
-  if (images.length === 0 && !canAttach) return null;
+  if (active.length === 0 && removed.length === 0 && !canAttach) return null;
 
   return (
     <div className="mt-2">
-      {images.length > 0 && (
+      {active.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {images.map((img) => (
+          {active.map((img) => (
             <div key={img.id} className="relative">
               <a href={`/api/governance/image/${img.id}`} target="_blank" rel="noopener noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -958,7 +960,20 @@ export function PointImages({
           ))}
         </div>
       )}
-      {canAttach && images.length < IMAGE_MAX_PER_POINT && (
+      {/* Removed images stay on the public record as a note (the bytes themselves are discarded). */}
+      {removed.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {removed.map((img) => (
+            <li key={img.id} className="text-[11px] italic text-faint">
+              {t("gov.act.imageRemovedAt", {
+                added: new Date(img.at).toISOString().slice(0, 16).replace("T", " "),
+                removed: new Date(img.removedAt!).toISOString().slice(0, 16).replace("T", " "),
+              })}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canAttach && active.length < IMAGE_MAX_PER_POINT && (
         <div className="mt-2">
           <input
             ref={fileRef}

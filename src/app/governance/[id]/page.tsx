@@ -58,19 +58,27 @@ export default async function GovernanceCasePage({
       id: true,
       width: true,
       height: true,
+      createdAt: true,
+      removedAt: true,
       initiationId: true,
       groundsEntryId: true,
       defenseId: true,
       defenseEntryId: true,
     },
   });
-  type PointImg = { id: string; width: number; height: number };
+  type PointImg = { id: string; width: number; height: number; at: string; removedAt: string | null };
   const imagesByOwner = new Map<string, PointImg[]>();
   for (const r of imageRows) {
     const owner = r.initiationId ?? r.groundsEntryId ?? r.defenseId ?? r.defenseEntryId;
     if (!owner) continue;
     const list = imagesByOwner.get(owner) ?? [];
-    list.push({ id: r.id, width: r.width, height: r.height });
+    list.push({
+      id: r.id,
+      width: r.width,
+      height: r.height,
+      at: r.createdAt.toISOString(),
+      removedAt: r.removedAt?.toISOString() ?? null,
+    });
     imagesByOwner.set(owner, list);
   }
   const imagesFor = (ownerId: string): PointImg[] => imagesByOwner.get(ownerId) ?? [];
