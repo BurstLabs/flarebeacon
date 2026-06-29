@@ -604,10 +604,25 @@ function PointNode({
   t: T;
 }) {
   const replies = childrenByRef.get(p.ref) ?? [];
-  const replyingToWho = p.replyToRef ? labelByRef.get(p.replyToRef) : null;
+  const isReply = !!p.replyToRef;
+  const replyingToWho = isReply ? labelByRef.get(p.replyToRef!) : null;
   return (
     <li>
-      {/* A reply shows who it answers, so the thread reads even when collapsed deep. */}
+      {/* A reply carries its own author line (role badge + who) — top-level points get their author
+          from the section/party header instead, so this is only shown for nested replies. The
+          "replying to" line below names the point it answers, so the thread reads on its own. */}
+      {isReply && (
+        <div className="mb-1 flex flex-wrap items-center gap-x-2 text-xs text-faint">
+          <span
+            className={`rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${
+              p.role === "provider" ? "bg-flare/15 text-flare" : "bg-elev text-faint"
+            }`}
+          >
+            {p.role === "provider" ? t("gov.case.roleProvider") : t("gov.case.roleMember")}
+          </span>
+          <span>{p.authorLabel}</span>
+        </div>
+      )}
       {replyingToWho && (
         <div className="mb-0.5 text-[11px] text-faint">
           {t("gov.case.replyingTo", { who: replyingToWho })}
