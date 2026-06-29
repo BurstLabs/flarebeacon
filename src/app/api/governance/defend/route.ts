@@ -87,14 +87,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "only the flagged provider can post a defense" }, { status: 403 });
   }
 
-  // A provider can respond from the moment it is flagged (PENDING, before a second member opens the
-  // case) through the open discussion and voting periods. Only a decided case closes the defense.
-  if (
-    theCase.state !== "PENDING" &&
-    theCase.state !== "OPEN_DISCUSSION" &&
-    theCase.state !== "OPEN_VOTING"
-  ) {
-    return NextResponse.json({ error: "the case is decided; the defense is closed" }, { status: 409 });
+  // A provider can respond from the moment it is flagged (PENDING) through the discussion period.
+  // Once voting opens the defense LOCKS, matching member grounds and the reply lock: the record that
+  // members vote on is frozen for everyone, so the provider cannot change its statement mid-vote.
+  // Same for flag cases and appeals (state-based).
+  if (theCase.state !== "PENDING" && theCase.state !== "OPEN_DISCUSSION") {
+    return NextResponse.json(
+      { error: "the response is locked once voting has opened" },
+      { status: 409 }
+    );
   }
 
   // Primary response: create on first post, edit thereafter. Every version is kept as a revision so

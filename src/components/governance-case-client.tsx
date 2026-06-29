@@ -1266,7 +1266,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
             editedAt: d.editedAt,
             images: d.images,
             priorVersions: d.priorVersions.map((r) => ({ text: r.body, title: r.title, at: r.at })),
-            editor: !decided ? (close) => providerEditor(undefined, true, d.body, d.title, d.images, close) : undefined,
+            editor: preVote ? (close) => providerEditor(undefined, true, d.body, d.title, d.images, close) : undefined,
           });
           d.entries.forEach((e) => {
             all.push({
@@ -1283,7 +1283,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
               editedAt: e.editedAt,
               images: e.images,
               priorVersions: e.priorVersions.map((r) => ({ text: r.body, title: r.title, at: r.at })),
-              editor: !decided ? (close) => providerEditor(e.id, false, e.body, e.title, e.images, close) : undefined,
+              editor: preVote ? (close) => providerEditor(e.id, false, e.body, e.title, e.images, close) : undefined,
             });
           });
         }
@@ -1380,13 +1380,13 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
                     </span>
                   </div>
                   {renderPoints(topLevelFor(ownRefs), true)}
-                  {!decided && <AddDefenseEntryAction caseId={v.id} />}
+                  {preVote && <AddDefenseEntryAction caseId={v.id} />}
                 </>
               );
             })()
           : null;
 
-        const providerFirstResponse = !v.defense && !decided && (
+        const providerFirstResponse = !v.defense && preVote && (
           <div className="mt-4 border-t border-themed pt-3">
             <p className="mb-1 text-xs text-muted">{t("gov.case.providerResponseHelp")}</p>
             <DefendAction caseId={v.id} current={null} />

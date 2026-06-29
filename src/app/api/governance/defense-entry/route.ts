@@ -95,12 +95,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "only the flagged provider can respond" }, { status: 403 });
   }
 
-  if (
-    theCase.state !== "PENDING" &&
-    theCase.state !== "OPEN_DISCUSSION" &&
-    theCase.state !== "OPEN_VOTING"
-  ) {
-    return NextResponse.json({ error: "the case is decided; the defense is closed" }, { status: 409 });
+  // Locks once voting opens, matching the primary defense and member grounds: the record members
+  // vote on is frozen for everyone. Same for flag cases and appeals (state-based).
+  if (theCase.state !== "PENDING" && theCase.state !== "OPEN_DISCUSSION") {
+    return NextResponse.json(
+      { error: "the response is locked once voting has opened" },
+      { status: 409 }
+    );
   }
 
   // Supplemental entries hang off the primary defense, so a primary response must exist first.
