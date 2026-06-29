@@ -948,6 +948,63 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
       </div>
       )}
 
+      {/* Votes on the record sit directly under the tally (same topic: the tally is the summary, this
+          is the detail). Shows each member's CURRENT vote (a member may change it while voting is
+          open), with a full append-only history of every cast/change below. */}
+      {v.votes.length > 0 && (
+        <div className="mt-6 surface rounded-xl border p-5">
+          <h2 className="mb-3 text-lg font-semibold">{t("gov.case.votesOnRecord")}</h2>
+          <ul className="divide-y divide-themed text-sm">
+            {v.votes.map((vote, n) => (
+              <li key={n} className="flex items-start justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="text-xs text-faint">{memberLabel(vote.member, vote.memberName)}</span>
+                    <span className="text-xs text-faint">&middot;</span>
+                    <RelTime at={vote.updatedAt} now={now} />
+                    {vote.changed && (
+                      <span
+                        title={t("gov.case.votePostedAt", { at: fmt(vote.at) })}
+                        className="cursor-help rounded bg-elev px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-faint"
+                      >
+                        {t("gov.case.voteChanged")}
+                      </span>
+                    )}
+                  </div>
+                  {vote.comment && <p className="mt-0.5 text-muted">{vote.comment}</p>}
+                </div>
+                <VoteBadge vote={vote.vote} t={t} />
+              </li>
+            ))}
+          </ul>
+
+          {/* Full audit trail: every cast and change, newest first. Collapsed by default. */}
+          {v.voteHistory.length > 0 && (
+            <details className="mt-3 rounded border border-themed/60 bg-elev/30 p-2 text-xs">
+              <summary className="cursor-pointer select-none text-faint hover:text-beacon">
+                {t("gov.case.voteHistory.show", { n: v.voteHistory.length })}
+              </summary>
+              <p className="mt-1 text-[11px] italic text-faint">{t("gov.case.voteHistory.note")}</p>
+              <ul className="mt-2 space-y-2">
+                {v.voteHistory.map((r, k) => (
+                  <li key={k} className="flex items-start justify-between gap-3 border-l-2 border-themed pl-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 text-faint">
+                        <span>{memberLabel(r.member, r.memberName)}</span>
+                        <span>&middot;</span>
+                        <RelTime at={r.at} now={now} />
+                      </div>
+                      {r.comment && <p className="mt-0.5 whitespace-pre-wrap text-muted">{r.comment}</p>}
+                    </div>
+                    <VoteBadge vote={r.vote} t={t} />
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
       {/* Hybrid discussion: a Flaggers section (the members who raised the flag, on flag cases only)
           and a Provider section (the provider's defense), with threaded replies nested under the point
           each one answers. Appeals have no flaggers, so member discussion (auto-initiations opened
@@ -1240,61 +1297,6 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         );
       })()}
 
-      {/* Votes on the record. Shows each member's CURRENT vote (a member may change it while voting
-          is open), with a full append-only history of every cast/change below. */}
-      {v.votes.length > 0 && (
-        <div className="mt-6 surface rounded-xl border p-5">
-          <h2 className="mb-3 text-lg font-semibold">{t("gov.case.votesOnRecord")}</h2>
-          <ul className="divide-y divide-themed text-sm">
-            {v.votes.map((vote, n) => (
-              <li key={n} className="flex items-start justify-between gap-3 py-2">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="text-xs text-faint">{memberLabel(vote.member, vote.memberName)}</span>
-                    <span className="text-xs text-faint">&middot;</span>
-                    <RelTime at={vote.updatedAt} now={now} />
-                    {vote.changed && (
-                      <span
-                        title={t("gov.case.votePostedAt", { at: fmt(vote.at) })}
-                        className="cursor-help rounded bg-elev px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-faint"
-                      >
-                        {t("gov.case.voteChanged")}
-                      </span>
-                    )}
-                  </div>
-                  {vote.comment && <p className="mt-0.5 text-muted">{vote.comment}</p>}
-                </div>
-                <VoteBadge vote={vote.vote} t={t} />
-              </li>
-            ))}
-          </ul>
-
-          {/* Full audit trail: every cast and change, newest first. Collapsed by default. */}
-          {v.voteHistory.length > 0 && (
-            <details className="mt-3 rounded border border-themed/60 bg-elev/30 p-2 text-xs">
-              <summary className="cursor-pointer select-none text-faint hover:text-beacon">
-                {t("gov.case.voteHistory.show", { n: v.voteHistory.length })}
-              </summary>
-              <p className="mt-1 text-[11px] italic text-faint">{t("gov.case.voteHistory.note")}</p>
-              <ul className="mt-2 space-y-2">
-                {v.voteHistory.map((r, k) => (
-                  <li key={k} className="flex items-start justify-between gap-3 border-l-2 border-themed pl-2">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-2 text-faint">
-                        <span>{memberLabel(r.member, r.memberName)}</span>
-                        <span>&middot;</span>
-                        <RelTime at={r.at} now={now} />
-                      </div>
-                      {r.comment && <p className="mt-0.5 whitespace-pre-wrap text-muted">{r.comment}</p>}
-                    </div>
-                    <VoteBadge vote={r.vote} t={t} />
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
     </div>
   );
 }
