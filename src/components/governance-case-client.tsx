@@ -639,6 +639,25 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         {v.appeal && (
           <AppealPanel providerId={v.providerId} appeal={v.appeal} now={now} t={t} />
         )}
+        {/* During discussion, say so plainly and show when voting opens. Voting has not started yet,
+            so no votes can be cast. */}
+        {v.state === "OPEN_DISCUSSION" && (
+          <div className="mt-4 rounded-lg border border-themed bg-elev/40 p-3 text-sm">
+            <p className="font-medium">
+              {t("gov.case.inDiscussion")}{" "}
+              <Countdown
+                target={v.discussionEndsAt}
+                now={now}
+                inLabel={t("gov.case.votingOpensIn")}
+                passedLabel={t("gov.case.votingOpensSoon")}
+              />
+            </p>
+            <p className="mt-1 text-xs text-muted">{t("gov.case.inDiscussionBody")}</p>
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-300">
+              {t("gov.case.providerResponsibility")}
+            </p>
+          </div>
+        )}
         {/* While voting is open, make the waiting state explicit: the case is NOT decided yet and
             stays open for the full voting period, even once the thresholds are already met. */}
         {v.state === "OPEN_VOTING" && (
@@ -659,6 +678,12 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
                   ? t("gov.case.provisionalClear")
                   : t("gov.case.provisionalQuorum")}
             </p>
+            {/* Only relevant while quorum is still short: the provider must rally the votes. */}
+            {!quorumMet && (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-300">
+                {t("gov.case.providerResponsibility")}
+              </p>
+            )}
           </div>
         )}
         {v.state === "OPEN_VOTING" && <VoteAction caseId={v.id} />}
