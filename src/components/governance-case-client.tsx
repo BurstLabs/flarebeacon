@@ -764,6 +764,11 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
   // The case actually opened (a 2nd member co-initiated) only once it reached discussion or beyond.
   // Until then the discussion/voting deadlines are provisional placeholders, not real dates.
   const hasOpened = idx >= 1;
+  // The Vote tally is only meaningful once voting is actually open, or once the case is decided (to
+  // show the final numbers + outcome). During PENDING and the discussion period there are no votes
+  // and no schedule, so an empty "0 of N, quorum not met" tally would imply a vote that has not
+  // started. A withdrawn case never voted, so it has no tally.
+  const showTally = !isWithdrawn && (v.state === "OPEN_VOTING" || (decided && !isWithdrawn));
   const quorumMet = v.votesCast >= v.turnoutFloor;
   const denyMet = v.denyVotes >= v.denyNeeded;
   // An appeal is upheld only by an affirmative KEEP supermajority (same 67%-of-decisive bar as deny),
@@ -940,11 +945,11 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         </div>
       </div>
 
-      {/* Live tally vs quorum. Hidden for a withdrawn flag (no voting ever happened) AND while the
-          case is still PENDING / not yet opened: a single flag has no schedule and no votes, so a
-          "0 of N needed, quorum not met" tally would imply a vote is underway when it is not. The
-          tally appears once a second member opens the case (discussion onward). */}
-      {!isWithdrawn && hasOpened && (
+      {/* Live tally vs quorum. Shown ONLY while voting is open or once decided (final numbers +
+          outcome). Hidden during PENDING and the discussion period (no votes, no schedule yet) and
+          for a withdrawn case, where an empty "0 of N, quorum not met" tally would imply a vote that
+          has not started. This applies identically to flag cases AND appeals (state-based). */}
+      {showTally && (
       <div className="mt-6 surface rounded-xl border p-5">
         <h2 className="mb-3 text-lg font-semibold">{t("gov.case.voteTally")}</h2>
         <div className="grid grid-cols-4 gap-3 text-center">
