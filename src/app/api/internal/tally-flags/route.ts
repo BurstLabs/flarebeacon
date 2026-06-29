@@ -84,6 +84,15 @@ export async function POST(req: NextRequest) {
       const decisiveVotes = denyVotes + keepVotes; // excludes abstentions (for the deny majority)
       const { decided } = evaluateOutcome(members.memberCount, votesCast, denyVotes, decisiveVotes);
 
+      // Suspension effect depends on whether this is a flag or an APPEAL, because the outcomes mean
+      // opposite things:
+      //   Flag case   - DENIED suspends; CLEARED and FAILED_QUORUM both leave the provider listed.
+      //   Appeal      - it must AFFIRMATIVELY overturn the original denial to lift the suspension, so
+      //                 only CLEARED (a keep majority) un-suspends. DENIED (deny majority upholds the
+      //                 denial) and FAILED_QUORUM (not enough votes to overturn) both KEEP it suspended.
+      const suspend = c.isReVote
+        ? decided !== "CLEARED" // appeal: only a CLEARED appeal lifts the suspension
+        : decided === "DENIED"; // flag: only a DENIED flag suspends
       await prisma.$transaction(async (tx) => {
         await tx.providerFlagCase.update({
           where: { id: c.id },
@@ -94,12 +103,7 @@ export async function POST(req: NextRequest) {
             outcomeDeny: denyVotes,
           },
         });
-        if (decided === "DENIED") {
-          await tx.provider.update({ where: { id: c.providerId }, data: { suspended: true } });
-        } else {
-          // CLEARED or FAILED_QUORUM: ensure not suspended (covers a successful appeal).
-          await tx.provider.update({ where: { id: c.providerId }, data: { suspended: false } });
-        }
+        await tx.provider.update({ where: { id: c.providerId }, data: { suspended: suspend } });
       });
       transitions.push({ caseId: c.id, to: decided });
     }

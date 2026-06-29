@@ -540,7 +540,23 @@ function EntryBlock({
   );
 }
 
-function outcomeLabel(t: T, state: string): { text: string; cls: string } {
+// The outcome reads OPPOSITELY for an appeal vs a flag, because the same vote result means opposite
+// things. A flag must reach a deny majority to suspend; an appeal must reach a keep majority to lift
+// an existing suspension. So for an appeal: DENIED and FAILED_QUORUM both mean the appeal FAILED
+// (suspension upheld), and only CLEARED means the appeal succeeded.
+function outcomeLabel(t: T, state: string, isReVote: boolean): { text: string; cls: string } {
+  if (isReVote) {
+    switch (state) {
+      case "CLEARED":
+        return { text: t("gov.case.outcome.appealUpheld"), cls: "text-emerald-400" };
+      case "DENIED":
+        return { text: t("gov.case.outcome.appealRejected"), cls: "text-flare" };
+      case "FAILED_QUORUM":
+        return { text: t("gov.case.outcome.appealFailedQuorum"), cls: "text-flare" };
+      default:
+        return { text: t("gov.case.outcome.inProgress"), cls: "text-muted" };
+    }
+  }
   switch (state) {
     case "DENIED":
       return { text: t("gov.case.outcome.denied"), cls: "text-flare" };
@@ -913,8 +929,8 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
           )}
         </div>
         {decided && (
-          <p className={`mt-4 font-medium ${outcomeLabel(t, v.state).cls}`}>
-            {t("gov.case.outcomePrefix")} {outcomeLabel(t, v.state).text}
+          <p className={`mt-4 font-medium ${outcomeLabel(t, v.state, v.isReVote).cls}`}>
+            {t("gov.case.outcomePrefix")} {outcomeLabel(t, v.state, v.isReVote).text}
           </p>
         )}
         {/* What happens next for a denied provider, including the appeal process. */}
@@ -955,10 +971,10 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
             </p>
             <p className="mt-1 text-xs text-muted">
               {quorumMet && denyMet
-                ? t("gov.case.provisionalDeny")
+                ? t(v.isReVote ? "gov.case.provisionalDenyAppeal" : "gov.case.provisionalDeny")
                 : quorumMet && !denyMet
-                  ? t("gov.case.provisionalClear")
-                  : t("gov.case.provisionalQuorum")}
+                  ? t(v.isReVote ? "gov.case.provisionalClearAppeal" : "gov.case.provisionalClear")
+                  : t(v.isReVote ? "gov.case.provisionalQuorumAppeal" : "gov.case.provisionalQuorum")}
             </p>
             {/* Only relevant while quorum is still short: the provider must rally the votes. */}
             {!quorumMet && (
