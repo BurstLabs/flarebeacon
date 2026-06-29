@@ -390,7 +390,12 @@ export function AppealAction({ providerId }: { providerId: string }) {
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.appealFailed"));
       setOk(t("gov.act.appealOpened"));
-      router.refresh();
+      // Go straight to the newly opened appeal case so the provider sees their appeal in progress.
+      if (typeof b.caseId === "string") {
+        router.push(`/governance/${b.caseId}`);
+      } else {
+        router.refresh();
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : t("gov.act.err.appealFailed"));
     } finally {
