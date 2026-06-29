@@ -200,7 +200,9 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
         {d.url}
       </a>
 
-      <ManageListingButton />
+      <ManageListingButton
+        ownerAddresses={d.addresses.filter((a) => a.verified).map((a) => a.address.toLowerCase())}
+      />
 
       {/* Management Group flag action (new providers only, when not already under review). */}
       {d.flaggable && !d.governance?.underReview && <FlagAction providerId={d.providerId} />}

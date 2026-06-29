@@ -16,7 +16,7 @@ declare global {
 // Inline "Manage this listing" on the provider page: connect the wallet and sign in (opening a
 // session), then route to /submit?manage=1, which detects the session and jumps straight to the
 // edit form - skipping the otherwise near-empty connect screen.
-export function ManageListingButton() {
+export function ManageListingButton({ ownerAddresses }: { ownerAddresses: string[] }) {
   const { t } = useApp();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -32,6 +32,12 @@ export function ManageListingButton() {
       })) as string[];
       const addr = accounts?.[0];
       if (!addr) throw new Error(t("submit.err.noAccount"));
+
+      // The connected wallet must be a verified owner of THIS provider; otherwise managing here
+      // would silently jump to whatever listing that wallet owns. Reject up front with a clear error.
+      if (!ownerAddresses.includes(addr.toLowerCase())) {
+        throw new Error(t("detail.manageWrongWallet"));
+      }
 
       // Match the wallet network to the session challenge chain (Flare 14) for a consistent popup.
       await switchWalletChain(window.ethereum, 14);
