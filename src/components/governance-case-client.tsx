@@ -966,7 +966,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
               </p>
               <p className="mt-1 text-xs text-muted">{t("gov.case.inDiscussionBody")}</p>
               <p className="mt-1 text-xs text-amber-600 dark:text-amber-300">
-                {t("gov.case.providerResponsibility")}
+                {t(v.isReVote ? "gov.case.providerResponsibility" : "gov.case.providerResponsibilityFlag")}
               </p>
             </div>
           )}
@@ -998,7 +998,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
               </p>
               {!quorumMet && (
                 <p className="mt-1 text-xs text-amber-600 dark:text-amber-300">
-                  {t("gov.case.providerResponsibility")}
+                  {t(v.isReVote ? "gov.case.providerResponsibility" : "gov.case.providerResponsibilityFlag")}
                 </p>
               )}
             </div>
