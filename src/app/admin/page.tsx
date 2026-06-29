@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useAccount } from "wagmi";
 import { useWalletSign } from "@/lib/useWalletSign";
 
 // Operator-only admin dashboard. English-only (internal tool, not a user-facing page). Access is
@@ -24,6 +25,11 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const connectAndSign = useWalletSign(adminT);
+  // The live connected wallet. The admin session (a cookie) and the connected wallet are independent,
+  // so we must reconcile them: access is granted only when the session is an admin AND the wallet
+  // currently connected is that same admin address. Otherwise a stale admin session would keep the
+  // dashboard open even after the user switches MetaMask to a different (non-admin) account.
+  const { address: walletAddress, isConnected } = useAccount();
 
   const checkSession = useCallback(async () => {
     try {
@@ -39,6 +45,16 @@ export default function AdminPage() {
   useEffect(() => {
     checkSession();
   }, [checkSession]);
+
+  // Effective access: admin session AND the connected wallet matches the session's admin address.
+  // If no wallet is connected, or it differs, the dashboard is withheld even though the session is
+  // valid - the operator must connect the admin wallet (and can re-sign via the gate below).
+  const walletMatchesSession =
+    isConnected &&
+    !!walletAddress &&
+    !!address &&
+    walletAddress.toLowerCase() === address.toLowerCase();
+  const hasAccess = admin === true && walletMatchesSession;
 
   async function connect() {
     setErr("");
@@ -63,15 +79,22 @@ export default function AdminPage() {
     return <div className="mx-auto max-w-5xl p-6 text-sm text-muted">Loading…</div>;
   }
 
-  if (!admin) {
+  if (!hasAccess) {
+    // Explain WHY access is withheld: not an admin session at all, an admin session but a different
+    // (or no) wallet connected, or simply not signed in. The connected wallet must match the admin.
+    const reason = !admin
+      ? address
+        ? `Signed in as ${address.slice(0, 6)}…${address.slice(-4)}, which is not an admin address.`
+        : "Connect an admin wallet to continue."
+      : !isConnected
+        ? "Your admin session is valid, but no wallet is connected. Connect the admin wallet to continue."
+        : !walletMatchesSession
+          ? `The connected wallet (${walletAddress?.slice(0, 6)}…${walletAddress?.slice(-4)}) is not the admin. Switch to the admin wallet and sign in.`
+          : "Connect an admin wallet to continue.";
     return (
       <div className="mx-auto max-w-md p-6">
         <h1 className="text-2xl font-bold">Admin</h1>
-        <p className="mt-2 text-sm text-muted">
-          {address
-            ? `Signed in as ${address.slice(0, 6)}…${address.slice(-4)}, which is not an admin address.`
-            : "Connect an admin wallet to continue."}
-        </p>
+        <p className="mt-2 text-sm text-muted">{reason}</p>
         <button
           onClick={connect}
           disabled={busy}
