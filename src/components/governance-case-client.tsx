@@ -1312,13 +1312,18 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
         );
 
         // One member's block: header + their top-level points (primary + own non-reply entries).
-        const MemberBlock = ({ i }: { i: CaseView["initiations"][number] }) => {
+        // This is a RENDER FUNCTION, not a nested component: defining a component inside this render
+        // gives it a new identity on every re-render (and this view re-renders every second via the
+        // `now` ticker), which would remount the subtree and reset child state - e.g. an open reply
+        // box would close itself ~1s after opening. Returning elements from a plain function lets
+        // React reconcile them normally and preserve that state.
+        const memberBlock = (i: CaseView["initiations"][number]) => {
           const ownRefs = [
             `initiation:${i.initiationId}`,
             ...i.entries.map((e) => `groundsEntry:${e.id}`),
           ];
           return (
-            <li>
+            <li key={i.initiationId}>
               {memberHeader(i)}
               {renderPoints(topLevelFor(ownRefs), false)}
               {preVote && <AddGroundsAction caseId={v.id} ownerVoter={i.member} />}
@@ -1377,9 +1382,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
                   <p className="text-sm text-muted">{t("gov.case.noGrounds")}</p>
                 ) : (
                   <ul className="space-y-6">
-                    {v.initiations.map((i) => (
-                      <MemberBlock key={i.initiationId} i={i} />
-                    ))}
+                    {v.initiations.map((i) => memberBlock(i))}
                   </ul>
                 )}
                 {openGrounds}
@@ -1404,9 +1407,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
                   <p className="text-sm text-muted">{t("gov.case.noGrounds")}</p>
                 ) : (
                   <ul className="space-y-6">
-                    {v.initiations.map((i) => (
-                      <MemberBlock key={i.initiationId} i={i} />
-                    ))}
+                    {v.initiations.map((i) => memberBlock(i))}
                   </ul>
                 )}
                 {openGrounds}
