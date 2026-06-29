@@ -150,6 +150,30 @@ export async function storePointImageBatch(opts: {
   return saved;
 }
 
+// Soft-remove a set of images that belong to a given point (ownerColumn=ownerId). Only rows that
+// match the owner are removed, so a caller can pass ids freely without cross-point leakage. The file
+// bytes are discarded; the row stays (removedAt set) for the public record. Returns how many removed.
+export async function removePointImages(opts: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prisma: any;
+  ownerColumn: string;
+  ownerId: string;
+  ids: string[];
+  now: Date;
+}): Promise<number> {
+  const { prisma, ownerColumn, ownerId, ids, now } = opts;
+  if (ids.length === 0) return 0;
+  const rows = await prisma.providerFlagPointImage.findMany({
+    where: { id: { in: ids }, [ownerColumn]: ownerId, removedAt: null },
+    select: { id: true, caseId: true, ext: true },
+  });
+  for (const r of rows) {
+    await prisma.providerFlagPointImage.update({ where: { id: r.id }, data: { removedAt: now } });
+    await deletePointImageFile(r.caseId, r.id, r.ext);
+  }
+  return rows.length;
+}
+
 // Pull image files out of a multipart form, capping count and per-file size. Returns the raw buffers
 // (validation/EXIF-strip happens in storePointImage). Throws if a file is too large.
 export async function imageBuffersFromForm(form: FormData): Promise<Buffer[]> {

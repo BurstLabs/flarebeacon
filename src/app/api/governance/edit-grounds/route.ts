@@ -4,6 +4,59 @@ import { verifyChallenge } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isClean } from "@/lib/content-filter";
 import { loadMembers, memberVoterFor } from "@/lib/governance";
+import {
+  imageBuffersFromForm,
+  storePointImageBatch,
+  removePointImages,
+} from "@/lib/point-image";
+import { randomUUID } from "crypto";
+
+// Parse the edit request as JSON (text only) or multipart (text + new images + removal ids + base64
+// auth), so a single signature can change the text and the images of a point together.
+async function readEditBody(req: NextRequest) {
+  const ct = req.headers.get("content-type") ?? "";
+  if (ct.includes("multipart/form-data")) {
+    const form = await req.formData();
+    let message: string | null = null;
+    let signature: string | null = null;
+    try {
+      const d = JSON.parse(Buffer.from(String(form.get("auth") ?? ""), "base64").toString("utf8"));
+      message = typeof d?.message === "string" ? d.message : null;
+      signature = typeof d?.signature === "string" ? d.signature : null;
+    } catch {
+      // null
+    }
+    const titleRaw = form.get("title");
+    const removeRaw = String(form.get("removeImageIds") ?? "");
+    return {
+      caseId: typeof form.get("caseId") === "string" ? String(form.get("caseId")) : null,
+      grounds: typeof form.get("grounds") === "string" ? String(form.get("grounds")).trim() : null,
+      entryId: typeof form.get("entryId") === "string" ? String(form.get("entryId")) : null,
+      ownerVoter: typeof form.get("ownerVoter") === "string" && form.get("ownerVoter")
+        ? String(form.get("ownerVoter")).toLowerCase()
+        : null,
+      message,
+      signature,
+      titleProvided: typeof titleRaw === "string",
+      title: typeof titleRaw === "string" ? titleRaw.trim().slice(0, 120) || null : undefined,
+      images: await imageBuffersFromForm(form),
+      removeImageIds: removeRaw ? removeRaw.split(",").filter(Boolean) : [],
+    };
+  }
+  const body = await req.json().catch(() => null);
+  return {
+    caseId: typeof body?.caseId === "string" ? body.caseId : null,
+    grounds: typeof body?.grounds === "string" ? body.grounds.trim() : null,
+    entryId: typeof body?.entryId === "string" ? body.entryId : null,
+    ownerVoter: typeof body?.ownerVoter === "string" ? body.ownerVoter.toLowerCase() : null,
+    message: typeof body?.message === "string" ? body.message : null,
+    signature: typeof body?.signature === "string" ? body.signature : null,
+    titleProvided: typeof body?.title === "string",
+    title: typeof body?.title === "string" ? body.title.trim().slice(0, 120) || null : undefined,
+    images: [] as Buffer[],
+    removeImageIds: [] as string[],
+  };
+}
 
 // POST /api/governance/edit-grounds
 // The Management Group member who raised a flag edits one of their grounds entries. The new text
@@ -18,18 +71,14 @@ export async function POST(req: NextRequest) {
   const limited = rateLimit(req, "governance", 10, 60_000);
   if (limited) return limited;
 
-  const body = await req.json().catch(() => null);
-  const caseId = typeof body?.caseId === "string" ? body.caseId : null;
-  const message = typeof body?.message === "string" ? body.message : null;
-  const signature = typeof body?.signature === "string" ? body.signature : null;
-  const grounds = typeof body?.grounds === "string" ? body.grounds.trim() : null;
-  const entryId = typeof body?.entryId === "string" ? body.entryId : null;
-  // The voter that owns the point being edited (the flag the Edit button sat under). Sent so we can
-  // reject editing another member's primary grounds instead of retargeting to the signer's own.
-  const ownerVoter = typeof body?.ownerVoter === "string" ? body.ownerVoter.toLowerCase() : null;
-  // Optional title; "" clears it. undefined (key absent) leaves it unchanged.
-  const titleProvided = typeof body?.title === "string";
-  const title = titleProvided ? body.title.trim().slice(0, 120) || null : undefined;
+  let parsed;
+  try {
+    parsed = await readEditBody(req);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "bad request" }, { status: 400 });
+  }
+  const { caseId, message, signature, grounds, entryId, ownerVoter, title, images, removeImageIds } =
+    parsed;
   if (!caseId || !message || !signature || !grounds) {
     return NextResponse.json(
       { error: "caseId, message, signature, and grounds are required" },
@@ -97,48 +146,73 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Resolve which point is being edited, then in one signed request: apply image removals + new
+  // images, AND the text change (if any). Image-only edits are valid (text unchanged).
+  const now = new Date();
+  const ownerColumn = entryId ? "groundsEntryId" : "initiationId";
+  let ownerId: string;
+  let curBody: string;
+  let curTitle: string | null;
+  let applyText: () => Promise<void>;
+
   if (entryId) {
-    // Editing a supplemental entry: it must belong to this member's flag.
     const entry = await prisma.providerFlagGroundsEntry.findUnique({ where: { id: entryId } });
     if (!entry || entry.initiationId !== mine.id) {
       return NextResponse.json({ error: "entry not found on your flag" }, { status: 404 });
     }
-    const bodyChanged = entry.grounds.trim() !== grounds;
-    const titleChanged = title !== undefined && (entry.title ?? null) !== title;
-    if (!bodyChanged && !titleChanged) {
-      return NextResponse.json({ ok: true, unchanged: true });
-    }
-    // The new title to persist/snapshot: the supplied one if provided, else the entry's current.
-    const newTitle = title !== undefined ? title : (entry.title ?? null);
-    await prisma.$transaction([
-      prisma.providerFlagGroundsEntry.update({
-        where: { id: entry.id },
-        data: { grounds, title: newTitle, editedAt: new Date() },
-      }),
-      // Title and body are both versioned, so any change records a revision.
-      prisma.providerFlagGroundsEntryRevision.create({
-        data: { entryId: entry.id, grounds, title: newTitle, signerAddress: verified.address! },
-      }),
-    ]);
-    return NextResponse.json({ ok: true });
+    ownerId = entry.id;
+    curBody = entry.grounds.trim();
+    curTitle = entry.title ?? null;
+    applyText = async () => {
+      const newTitle = title !== undefined ? title : (entry.title ?? null);
+      await prisma.$transaction([
+        prisma.providerFlagGroundsEntry.update({
+          where: { id: entry.id },
+          data: { grounds, title: newTitle, editedAt: now },
+        }),
+        prisma.providerFlagGroundsEntryRevision.create({
+          data: { entryId: entry.id, grounds, title: newTitle, signerAddress: verified.address! },
+        }),
+      ]);
+    };
+  } else {
+    ownerId = mine.id;
+    curBody = mine.grounds.trim();
+    curTitle = mine.title ?? null;
+    applyText = async () => {
+      const newTitle = title !== undefined ? title : (mine.title ?? null);
+      await prisma.$transaction([
+        prisma.providerFlagInitiation.update({
+          where: { id: mine.id },
+          data: { grounds, title: newTitle, editedAt: now },
+        }),
+        prisma.providerFlagGroundsRevision.create({
+          data: { initiationId: mine.id, grounds, title: newTitle, signerAddress: verified.address! },
+        }),
+      ]);
+    };
   }
 
-  // Editing the primary grounds (the initiation itself).
-  const bodyChanged = mine.grounds.trim() !== grounds;
-  const titleChanged = title !== undefined && (mine.title ?? null) !== title;
-  if (!bodyChanged && !titleChanged) {
+  // Image mutations first (so a point can change images even with unchanged text).
+  let removed = 0;
+  let added = 0;
+  try {
+    removed = await removePointImages({ prisma, ownerColumn, ownerId, ids: removeImageIds, now });
+    added = await storePointImageBatch({
+      prisma, randomUUID, caseId, ownerColumn, ownerId, signerAddress: verified.address!, files: images,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "could not update images" },
+      { status: 400 }
+    );
+  }
+
+  const textChanged = curBody !== grounds || (title !== undefined && curTitle !== title);
+  if (textChanged) await applyText();
+
+  if (!textChanged && removed === 0 && added === 0) {
     return NextResponse.json({ ok: true, unchanged: true });
   }
-  const newTitle = title !== undefined ? title : (mine.title ?? null);
-  await prisma.$transaction([
-    prisma.providerFlagInitiation.update({
-      where: { id: mine.id },
-      data: { grounds, title: newTitle, editedAt: new Date() },
-    }),
-    prisma.providerFlagGroundsRevision.create({
-      data: { initiationId: mine.id, grounds, title: newTitle, signerAddress: verified.address! },
-    }),
-  ]);
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, added, removed });
 }

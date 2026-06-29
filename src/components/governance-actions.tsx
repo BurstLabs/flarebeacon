@@ -216,6 +216,7 @@ export function EditGroundsAction({
   ownerVoter,
   current = "",
   currentTitle = "",
+  currentImages = [],
   onDone,
 }: {
   caseId: string;
@@ -225,6 +226,7 @@ export function EditGroundsAction({
   ownerVoter?: string;
   current?: string;
   currentTitle?: string;
+  currentImages?: { id: string }[];
   // Called after a successful save (parent closes the editor).
   onDone?: () => void;
 }) {
@@ -232,8 +234,11 @@ export function EditGroundsAction({
   const router = useRouter();
   const [grounds, setGrounds] = useState(current);
   const [title, setTitle] = useState(currentTitle);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [removeIds, setRemoveIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const keptImages = currentImages.filter((i) => !removeIds.includes(i.id));
 
   async function submit() {
     setErr("");
@@ -244,11 +249,26 @@ export function EditGroundsAction({
     setBusy(true);
     try {
       const s = await signChallenge(t);
-      const res = await fetch("/api/governance/edit-grounds", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ caseId, entryId, ownerVoter, grounds, title, message: s.message, signature: s.signature }),
-      });
+      const hasImageChange = newFiles.length > 0 || removeIds.length > 0;
+      let res: Response;
+      if (hasImageChange) {
+        const fd = new FormData();
+        fd.append("caseId", caseId);
+        if (entryId) fd.append("entryId", entryId);
+        if (ownerVoter) fd.append("ownerVoter", ownerVoter);
+        fd.append("grounds", grounds);
+        fd.append("title", title);
+        if (removeIds.length) fd.append("removeImageIds", removeIds.join(","));
+        for (const f of newFiles) fd.append("images", f);
+        fd.append("auth", btoa(JSON.stringify({ message: s.message, signature: s.signature })));
+        res = await fetch("/api/governance/edit-grounds", { method: "POST", body: fd });
+      } else {
+        res = await fetch("/api/governance/edit-grounds", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ caseId, entryId, ownerVoter, grounds, title, message: s.message, signature: s.signature }),
+        });
+      }
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.editFailed"));
       router.refresh();
@@ -269,6 +289,14 @@ export function EditGroundsAction({
         maxLength={2000}
         placeholder={t("gov.act.editPlaceholder")}
         className="block min-h-[100px] w-full rounded border border-themed bg-elev px-3 py-2 text-sm"
+      />
+      <EditImageControls
+        kept={keptImages}
+        markRemove={(id) => setRemoveIds((r) => [...r, id])}
+        newFiles={newFiles}
+        setNewFiles={setNewFiles}
+        disabled={busy}
+        t={t}
       />
       <button
         onClick={submit}
@@ -644,6 +672,8 @@ export function EditResponseAction({
   isPrimary,
   current,
   currentTitle = "",
+  currentImages = [],
+  imagesEditable = false,
   onDone,
 }: {
   caseId: string;
@@ -651,14 +681,20 @@ export function EditResponseAction({
   isPrimary: boolean;
   current: string;
   currentTitle?: string;
+  currentImages?: { id: string }[];
+  // Images only change pre-vote; text may change through voting. The parent passes this.
+  imagesEditable?: boolean;
   onDone?: () => void;
 }) {
   const { t } = useApp();
   const router = useRouter();
   const [body, setBody] = useState(current);
   const [title, setTitle] = useState(currentTitle);
+  const [newFiles, setNewFiles] = useState<File[]>([]);
+  const [removeIds, setRemoveIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const keptImages = currentImages.filter((i) => !removeIds.includes(i.id));
 
   async function submit() {
     setErr("");
@@ -667,11 +703,25 @@ export function EditResponseAction({
     try {
       const s = await signChallenge(t);
       const url = isPrimary ? "/api/governance/defend" : "/api/governance/defense-entry";
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ caseId, entryId, body, title, message: s.message, signature: s.signature }),
-      });
+      const hasImageChange = imagesEditable && (newFiles.length > 0 || removeIds.length > 0);
+      let res: Response;
+      if (hasImageChange) {
+        const fd = new FormData();
+        fd.append("caseId", caseId);
+        if (entryId) fd.append("entryId", entryId);
+        fd.append("body", body);
+        fd.append("title", title);
+        if (removeIds.length) fd.append("removeImageIds", removeIds.join(","));
+        for (const f of newFiles) fd.append("images", f);
+        fd.append("auth", btoa(JSON.stringify({ message: s.message, signature: s.signature })));
+        res = await fetch(url, { method: "POST", body: fd });
+      } else {
+        res = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ caseId, entryId, body, title, message: s.message, signature: s.signature }),
+        });
+      }
       const b = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(typeof b.error === "string" ? b.error : t("gov.act.err.editFailed"));
       router.refresh();
@@ -693,6 +743,16 @@ export function EditResponseAction({
         placeholder={t("gov.act.addResponsePlaceholder")}
         className="block min-h-[80px] w-full rounded border border-themed bg-elev px-3 py-2 text-sm"
       />
+      {imagesEditable && (
+        <EditImageControls
+          kept={keptImages}
+          markRemove={(id) => setRemoveIds((r) => [...r, id])}
+          newFiles={newFiles}
+          setNewFiles={setNewFiles}
+          disabled={busy}
+          t={t}
+        />
+      )}
       <button
         onClick={submit}
         disabled={busy}
@@ -862,6 +922,85 @@ function PendingImagePicker({
   );
 }
 
+// Image controls inside an EDIT form: shows the point's current images (each with a remove toggle)
+// and a picker for new images. Marking removals + adding files are staged here and committed by the
+// parent edit form in ONE signed request, so editing text + images costs a single signature.
+function EditImageControls({
+  kept,
+  markRemove,
+  newFiles,
+  setNewFiles,
+  disabled,
+  t,
+}: {
+  kept: { id: string }[];
+  markRemove: (id: string) => void;
+  newFiles: File[];
+  setNewFiles: (f: File[]) => void;
+  disabled: boolean;
+  t: TFn;
+}) {
+  const total = kept.length + newFiles.length;
+  return (
+    <div className="mt-2">
+      {kept.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {kept.map((img) => (
+            <div key={img.id} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/governance/image/${img.id}`}
+                alt={t("gov.case.evidenceAlt")}
+                className="h-16 w-16 rounded border border-themed object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => markRemove(img.id)}
+                disabled={disabled}
+                title={t("gov.act.imageRemove")}
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-themed bg-elev text-xs text-muted hover:text-flare disabled:opacity-50"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {total < IMAGE_MAX_PER_POINT && (
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          multiple
+          disabled={disabled}
+          onChange={(e) => {
+            const picked = Array.from(e.target.files ?? []);
+            setNewFiles([...newFiles, ...picked].slice(0, IMAGE_MAX_PER_POINT - kept.length));
+          }}
+          className="mt-2 block text-xs text-muted file:mr-2 file:rounded file:border file:border-themed file:bg-elev file:px-2 file:py-1 file:text-xs file:text-muted hover:file:text-beacon disabled:opacity-50"
+        />
+      )}
+      {newFiles.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {newFiles.map((f, i) => (
+            <li key={i} className="flex items-center gap-2 text-[11px] text-faint">
+              <span className="truncate">+ {f.name}</span>
+              <button
+                type="button"
+                onClick={() => setNewFiles(newFiles.filter((_, k) => k !== i))}
+                disabled={disabled}
+                className="text-muted hover:text-flare disabled:opacity-50"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1 text-[11px] text-faint">{t("gov.act.imageHint")}</p>
+    </div>
+  );
+}
+
 // Evidence images on a governance point: a thumbnail strip everyone sees, plus upload + remove for
 // the point's author while the case is still editable. Each action is wallet-signature gated; the
 // server re-verifies authorship and the case phase.
@@ -883,8 +1022,8 @@ export function PointImages({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const active = images.filter((i) => !i.removedAt);
-  const removed = images.filter((i) => i.removedAt);
+  // The caller passes only active (non-removed) images; removed ones live in the edit history.
+  const active = images;
 
   async function upload(file: File) {
     setErr("");
@@ -930,7 +1069,7 @@ export function PointImages({
     }
   }
 
-  if (active.length === 0 && removed.length === 0 && !canAttach) return null;
+  if (active.length === 0 && !canAttach) return null;
 
   return (
     <div className="mt-2">
@@ -959,19 +1098,6 @@ export function PointImages({
             </div>
           ))}
         </div>
-      )}
-      {/* Removed images stay on the public record as a note (the bytes themselves are discarded). */}
-      {removed.length > 0 && (
-        <ul className="mt-1 space-y-0.5">
-          {removed.map((img) => (
-            <li key={img.id} className="text-[11px] italic text-faint">
-              {t("gov.act.imageRemovedAt", {
-                added: new Date(img.at).toISOString().slice(0, 16).replace("T", " "),
-                removed: new Date(img.removedAt!).toISOString().slice(0, 16).replace("T", " "),
-              })}
-            </li>
-          ))}
-        </ul>
       )}
       {canAttach && active.length < IMAGE_MAX_PER_POINT && (
         <div className="mt-2">

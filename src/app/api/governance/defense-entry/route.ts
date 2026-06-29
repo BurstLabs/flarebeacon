@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyChallenge } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isClean } from "@/lib/content-filter";
-import { imageBuffersFromForm, storePointImageBatch } from "@/lib/point-image";
+import { imageBuffersFromForm, storePointImageBatch, removePointImages } from "@/lib/point-image";
 import { randomUUID } from "crypto";
 
 // Parse JSON, or multipart (text + images + base64 auth) when images are attached on creation.
@@ -21,6 +21,7 @@ async function readBody(req: NextRequest) {
       // null
     }
     const titleRaw = form.get("title");
+    const removeRaw = String(form.get("removeImageIds") ?? "");
     return {
       caseId: typeof form.get("caseId") === "string" ? String(form.get("caseId")) : null,
       text: typeof form.get("body") === "string" ? String(form.get("body")).trim() : null,
@@ -30,6 +31,7 @@ async function readBody(req: NextRequest) {
       titleProvided: typeof titleRaw === "string",
       title: typeof titleRaw === "string" ? titleRaw.trim().slice(0, 120) || null : undefined,
       images: await imageBuffersFromForm(form),
+      removeImageIds: removeRaw ? removeRaw.split(",").filter(Boolean) : [],
     };
   }
   const p = await req.json().catch(() => null);
@@ -42,6 +44,7 @@ async function readBody(req: NextRequest) {
     titleProvided: typeof p?.title === "string",
     title: typeof p?.title === "string" ? p.title.trim().slice(0, 120) || null : undefined,
     images: [] as Buffer[],
+    removeImageIds: [] as string[],
   };
 }
 
@@ -57,7 +60,7 @@ export async function POST(req: NextRequest) {
   const limited = rateLimit(req, "governance", 10, 60_000);
   if (limited) return limited;
 
-  const { caseId, text, entryId, message, signature, title, images } = await readBody(req);
+  const { caseId, text, entryId, message, signature, title, images, removeImageIds } = await readBody(req);
   if (!caseId || !text || !message || !signature) {
     return NextResponse.json(
       { error: "caseId, body, message, and signature are required" },
@@ -111,22 +114,44 @@ export async function POST(req: NextRequest) {
     if (!entry || entry.defenseId !== theCase.defense.id) {
       return NextResponse.json({ error: "entry not found on your response" }, { status: 404 });
     }
+    const now = new Date();
     const bodyChanged = entry.body.trim() !== text;
     const titleChanged = title !== undefined && (entry.title ?? null) !== title;
-    if (!bodyChanged && !titleChanged) {
+    // Images change only pre-vote; process first so an image-only edit is valid.
+    let added = 0;
+    let removed = 0;
+    if (theCase.state === "PENDING" || theCase.state === "OPEN_DISCUSSION") {
+      try {
+        removed = await removePointImages({
+          prisma, ownerColumn: "defenseEntryId", ownerId: entry.id, ids: removeImageIds, now,
+        });
+        added = await storePointImageBatch({
+          prisma, randomUUID, caseId, ownerColumn: "defenseEntryId",
+          ownerId: entry.id, signerAddress: verified.address!, files: images,
+        });
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "could not update images" },
+          { status: 400 }
+        );
+      }
+    }
+    if (!bodyChanged && !titleChanged && added === 0 && removed === 0) {
       return NextResponse.json({ ok: true, unchanged: true });
     }
-    const newTitle = title !== undefined ? title : (entry.title ?? null);
-    await prisma.$transaction([
-      prisma.providerFlagDefenseEntry.update({
-        where: { id: entry.id },
-        data: { body: text, title: newTitle, editedAt: new Date() },
-      }),
-      prisma.providerFlagDefenseEntryRevision.create({
-        data: { entryId: entry.id, body: text, title: newTitle },
-      }),
-    ]);
-    return NextResponse.json({ ok: true });
+    if (bodyChanged || titleChanged) {
+      const newTitle = title !== undefined ? title : (entry.title ?? null);
+      await prisma.$transaction([
+        prisma.providerFlagDefenseEntry.update({
+          where: { id: entry.id },
+          data: { body: text, title: newTitle, editedAt: now },
+        }),
+        prisma.providerFlagDefenseEntryRevision.create({
+          data: { entryId: entry.id, body: text, title: newTitle },
+        }),
+      ]);
+    }
+    return NextResponse.json({ ok: true, added, removed });
   }
 
   // New supplemental entry + its first revision.

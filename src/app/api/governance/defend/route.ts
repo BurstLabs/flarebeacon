@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyChallenge } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isClean } from "@/lib/content-filter";
-import { imageBuffersFromForm, storePointImageBatch } from "@/lib/point-image";
+import { imageBuffersFromForm, storePointImageBatch, removePointImages } from "@/lib/point-image";
 import { randomUUID } from "crypto";
 
 async function readBody(req: NextRequest) {
@@ -20,6 +20,7 @@ async function readBody(req: NextRequest) {
       // null
     }
     const titleRaw = form.get("title");
+    const removeRaw = String(form.get("removeImageIds") ?? "");
     return {
       caseId: typeof form.get("caseId") === "string" ? String(form.get("caseId")) : null,
       text: typeof form.get("body") === "string" ? String(form.get("body")).trim() : null,
@@ -27,6 +28,7 @@ async function readBody(req: NextRequest) {
       signature,
       title: typeof titleRaw === "string" ? titleRaw.trim().slice(0, 120) || null : undefined,
       images: await imageBuffersFromForm(form),
+      removeImageIds: removeRaw ? removeRaw.split(",").filter(Boolean) : [],
     };
   }
   const p = await req.json().catch(() => null);
@@ -37,6 +39,7 @@ async function readBody(req: NextRequest) {
     signature: typeof p?.signature === "string" ? p.signature : null,
     title: typeof p?.title === "string" ? p.title.trim().slice(0, 120) || null : undefined,
     images: [] as Buffer[],
+    removeImageIds: [] as string[],
   };
 }
 
@@ -49,7 +52,7 @@ export async function POST(req: NextRequest) {
   const limited = rateLimit(req, "governance", 10, 60_000);
   if (limited) return limited;
 
-  const { caseId, text, message, signature, title, images } = await readBody(req);
+  const { caseId, text, message, signature, title, images, removeImageIds } = await readBody(req);
   if (!caseId || !text || !message || !signature) {
     return NextResponse.json(
       { error: "caseId, body, message, and signature are required" },
@@ -119,21 +122,44 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, defenseId: created.id, imageCount });
   } else {
+    const now = new Date();
     const bodyChanged = existing.body.trim() !== text;
     const titleChanged = title !== undefined && (existing.title ?? null) !== title;
-    if (!bodyChanged && !titleChanged) {
+    // Images can only change pre-vote; text can change through voting. Process images first so an
+    // image-only edit is valid even when the text is unchanged.
+    let added = 0;
+    let removed = 0;
+    if (theCase.state === "PENDING" || theCase.state === "OPEN_DISCUSSION") {
+      try {
+        removed = await removePointImages({
+          prisma, ownerColumn: "defenseId", ownerId: existing.id, ids: removeImageIds, now,
+        });
+        added = await storePointImageBatch({
+          prisma, randomUUID, caseId, ownerColumn: "defenseId",
+          ownerId: existing.id, signerAddress: verified.address!, files: images,
+        });
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "could not update images" },
+          { status: 400 }
+        );
+      }
+    }
+    if (!bodyChanged && !titleChanged && added === 0 && removed === 0) {
       return NextResponse.json({ ok: true, unchanged: true });
     }
-    const newTitle = title !== undefined ? title : (existing.title ?? null);
-    await prisma.$transaction([
-      prisma.providerFlagDefense.update({
-        where: { id: existing.id },
-        data: { body: text, title: newTitle, editedAt: new Date() },
-      }),
-      prisma.providerFlagDefenseRevision.create({
-        data: { defenseId: existing.id, body: text, title: newTitle },
-      }),
-    ]);
+    if (bodyChanged || titleChanged) {
+      const newTitle = title !== undefined ? title : (existing.title ?? null);
+      await prisma.$transaction([
+        prisma.providerFlagDefense.update({
+          where: { id: existing.id },
+          data: { body: text, title: newTitle, editedAt: now },
+        }),
+        prisma.providerFlagDefenseRevision.create({
+          data: { defenseId: existing.id, body: text, title: newTitle },
+        }),
+      ]);
+    }
   }
 
   return NextResponse.json({ ok: true });

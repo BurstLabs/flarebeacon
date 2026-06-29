@@ -405,44 +405,61 @@ function EntryBlock({
       ) : (
         <p className="mt-1 whitespace-pre-wrap">{text}</p>
       )}
-      {/* Evidence images on this point: thumbnails (always visible), plus attach/remove for the
-          author while the case is editable. */}
-      {ownerType && ownerId && (
+      {/* Active evidence images on this point: thumbnails, plus attach/remove for the author while
+          the case is editable. Removed images are NOT shown here; they live in the edit history. */}
+      {ownerType && ownerId && !editing && (
         <PointImages
-          images={images ?? []}
+          images={(images ?? []).filter((i) => !i.removedAt)}
           ownerType={ownerType}
           ownerId={ownerId}
-          canAttach={!!canAttach}
+          // Author image management now happens in the Edit form (one signature for text + images),
+          // so the standalone attach/remove here is only offered when there is no editor at all.
+          canAttach={!!canAttach && !editor}
           t={t}
         />
       )}
-      {/* Read-only public revision history for THIS point only. Collapsed by default and visually
-          inset so it never reads as a separate point. Prior versions cannot be edited. */}
-      {priorVersions.length > 0 && (
-        <details className="mt-2 ml-1 rounded border border-themed/60 bg-elev/30 p-2 text-xs">
-          <summary className="cursor-pointer select-none text-faint hover:text-beacon">
-            {t("gov.case.history.show", { n: priorVersions.length })}
-          </summary>
-          <p className="mt-1 text-[11px] italic text-faint">{t("gov.case.history.note")}</p>
-          <ul className="mt-2 space-y-2">
-            {/* Most recent first. The chronologically-oldest entry (index 0 in the source array,
-                which is ascending) is the "Original"; all others are "Revised", regardless of where
-                they land in this reversed display order. */}
-            {priorVersions.map((_, k) => priorVersions[priorVersions.length - 1 - k]).map((r, k) => (
-              <li key={k} className="border-l-2 border-themed pl-2">
-                <div className="text-faint">
-                  {k === priorVersions.length - 1
-                    ? t("gov.case.history.original")
-                    : t("gov.case.history.revised")}{" "}
-                  &middot; <RelTime at={r.at} now={now} />
-                </div>
-                {r.title && <div className="mt-0.5 font-medium text-muted">{r.title}</div>}
-                <p className="mt-0.5 whitespace-pre-wrap text-muted">{r.text}</p>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {/* Read-only public history for THIS point: text revisions AND removed-image records, merged
+          and collapsed by default. */}
+      {(() => {
+        const removedImages = (images ?? []).filter((i) => i.removedAt);
+        const historyCount = priorVersions.length + removedImages.length;
+        if (historyCount === 0) return null;
+        const revs = priorVersions.map((_, k) => priorVersions[priorVersions.length - 1 - k]);
+        return (
+          <details className="mt-2 ml-1 rounded border border-themed/60 bg-elev/30 p-2 text-xs">
+            <summary className="cursor-pointer select-none text-faint hover:text-beacon">
+              {t("gov.case.history.show", { n: historyCount })}
+            </summary>
+            <p className="mt-1 text-[11px] italic text-faint">{t("gov.case.history.note")}</p>
+            <ul className="mt-2 space-y-2">
+              {revs.map((r, k) => (
+                <li key={`t${k}`} className="border-l-2 border-themed pl-2">
+                  <div className="text-faint">
+                    {k === revs.length - 1
+                      ? t("gov.case.history.original")
+                      : t("gov.case.history.revised")}{" "}
+                    &middot; <RelTime at={r.at} now={now} />
+                  </div>
+                  {r.title && <div className="mt-0.5 font-medium text-muted">{r.title}</div>}
+                  <p className="mt-0.5 whitespace-pre-wrap text-muted">{r.text}</p>
+                </li>
+              ))}
+              {/* Removed images, newest first. The bytes are gone; only the record remains. */}
+              {removedImages
+                .slice()
+                .reverse()
+                .map((img) => (
+                  <li key={`i${img.id}`} className="border-l-2 border-themed pl-2 text-faint">
+                    {t("gov.act.imageRemovedAt", {
+                      added: fmt(img.at),
+                      removed: fmt(img.removedAt!),
+                    })}
+                  </li>
+                ))}
+            </ul>
+          </details>
+        );
+      })()}
     </div>
   );
 }
@@ -804,6 +821,7 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
                                     ownerVoter={i.member}
                                     current={p.text}
                                     currentTitle={p.title ?? ""}
+                                    currentImages={p.images.filter((im) => !im.removedAt)}
                                     onDone={close}
                                   />
                                 )
@@ -896,6 +914,8 @@ export function GovernanceCaseClient({ view: v }: { view: CaseView }) {
                                   isPrimary={p.isPrimary}
                                   current={p.text}
                                   currentTitle={p.title ?? ""}
+                                  currentImages={p.images.filter((im) => !im.removedAt)}
+                                  imagesEditable={canAttachImg}
                                   onDone={close}
                                 />
                               )
