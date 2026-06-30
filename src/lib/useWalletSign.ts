@@ -8,7 +8,7 @@
 // it signs through wagmi's connector rather than window.ethereum directly. The backend is unchanged:
 // it still receives { message, signature } and recovers the address.
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useAppKit } from "@reown/appkit/react";
 import { useAccount, useSignMessage, useSwitchChain } from "wagmi";
 
@@ -59,8 +59,15 @@ export function useWalletSign(t: TFn) {
   const { signMessageAsync } = useSignMessage();
   const { switchChainAsync } = useSwitchChain();
 
-  // useAccount's address is captured per-render; expose a live getter for the imperative wait.
-  const getAddress = useCallback(() => connectedAddress, [connectedAddress]);
+  // useAccount's address is captured per-render. The imperative wait below runs across many renders
+  // (while the user picks a wallet in the AppKit modal), so a closure over `connectedAddress` would
+  // stay stale and the poll would never see the connection - the "stuck on Connecting" bug. Mirror
+  // the live value into a ref updated every render, and have the getter read the ref.
+  const addressRef = useRef(connectedAddress);
+  useEffect(() => {
+    addressRef.current = connectedAddress;
+  }, [connectedAddress]);
+  const getAddress = useCallback(() => addressRef.current, []);
 
   return useCallback(
     async (opts: ConnectAndSignOpts): Promise<SignedChallenge> => {
