@@ -65,21 +65,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // The CALLER must already own the target listing. Linking attaches B with one signature from B, so
-  // without this check anyone controlling a registered address could attach themselves (verified +
-  // listed) to ANY listing by name (S1: listing takeover). We require an authenticated session whose
-  // address is a verified owner of the target, i.e. the caller previously claimed/signed in to it.
-  const sessionAddr = (await getSessionAddress())?.toLowerCase() ?? null;
-  if (!sessionAddr) {
-    return NextResponse.json(
-      { error: "sign in to the listing you want to add a network to before linking" },
-      { status: 401 }
-    );
-  }
-
-  // Find the target listing by name. Match BY NAME using the shared normaliser (S14: same rule the
-  // create path uses), require it to already be claimed, AND require the session to be one of its
-  // verified owners.
+  // Find the target listing by name (shared normaliser, S14), and require it to already be claimed.
   const { normalizeName } = await import("@/lib/validation");
   const candidates = await prisma.provider.findMany({
     select: { id: true, name: true, addresses: { select: { address: true, verified: true } } },
@@ -99,14 +85,33 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
-  const callerOwnsTarget = ownedA.addresses.some(
-    (a) => a.verified && a.address.toLowerCase() === sessionAddr
+
+  // Authorization. Two legitimate cases, both safe:
+  //   (a) VERIFY AN EXISTING ROW: the signing address B is already on this listing (e.g. a claimed-
+  //       but-unproven second network). Signing AS that address is itself the proof - no separate
+  //       owner session is needed.
+  //   (b) LINK A NEW ADDRESS: B is not yet on the listing. This is the takeover-sensitive path (S1),
+  //       so it requires an authenticated session that is already a VERIFIED owner of the listing.
+  const bAlreadyOnListing = ownedA.addresses.some(
+    (a) => a.address.toLowerCase() === addressB.toLowerCase()
   );
-  if (!callerOwnsTarget) {
-    return NextResponse.json(
-      { error: "you are not a verified owner of this listing; sign in with an address already on it" },
-      { status: 403 }
+  if (!bAlreadyOnListing) {
+    const sessionAddr = (await getSessionAddress())?.toLowerCase() ?? null;
+    if (!sessionAddr) {
+      return NextResponse.json(
+        { error: "sign in to the listing you want to add a network to before linking" },
+        { status: 401 }
+      );
+    }
+    const callerOwnsTarget = ownedA.addresses.some(
+      (a) => a.verified && a.address.toLowerCase() === sessionAddr
     );
+    if (!callerOwnsTarget) {
+      return NextResponse.json(
+        { error: "you are not a verified owner of this listing; sign in with an address already on it" },
+        { status: 403 }
+      );
+    }
   }
 
   // If address B already belongs to a DIFFERENT provider, only allow the merge when that record
