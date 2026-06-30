@@ -78,11 +78,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Find any existing provider that holds the session address, whether it was a prior verified
-  // claim OR an imported (not-yet-claimed) seed entry. Matching imported entries is what lets a
-  // sign-in claim and edit an existing listing instead of creating a duplicate provider.
+  // Find any existing provider the caller controls, whether it was a prior verified claim OR an
+  // imported (not-yet-claimed) seed entry. Matching imported entries is what lets a sign-in claim and
+  // edit an existing listing instead of creating a duplicate. The caller may have signed with a role
+  // address that is NOT a stored listing row, so match by the CONTROLLED canonical addresses (which
+  // include the session and any submitted network whose entity the session is a role of), not just
+  // the raw session address.
   const existingOwned = await prisma.providerAddress.findFirst({
-    where: { address: session },
+    where: { address: { in: [...controlled] } },
     select: { providerId: true },
   });
 
@@ -133,10 +136,11 @@ export async function POST(req: NextRequest) {
       where: { chainId_address: { chainId: a.chainId, address: a.address } },
     });
     if (!claim) continue; // brand-new address, fine
-    const isSessionAddr = a.address === session;
+    // "Mine" = the caller controls this (canonical) address (session itself, or a network whose
+    // entity the session is a role of), or it already belongs to the caller's existing record.
+    const isControlledAddr = controlled.has(a.address.toLowerCase());
     const ownedByMe = claim.providerId === existingOwned?.providerId;
-    // Allowed: my own record (any address), or the signed session address claiming its record.
-    if (!ownedByMe && !isSessionAddr) {
+    if (!ownedByMe && !isControlledAddr) {
       return NextResponse.json(
         {
           error: `address ${a.address} on chain ${a.chainId} belongs to another listing`,
