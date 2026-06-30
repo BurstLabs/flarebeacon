@@ -226,15 +226,26 @@ function SubmitPageInner() {
       if (p.logoURI) setLogoUri(p.logoURI);
       setPrivateNode(!!p.privateNode);
       if (p.algorithm === "in-house" || p.algorithm === "open-source") setAlgorithm(p.algorithm);
-      // Pin chainId to the signed-in address's actual chain, so a later save writes the right
-      // network (not whatever the now-hidden dropdown last held). The connected wallet may be one of
-      // the entity's role addresses (not the listing's stored address), so if it isn't found directly
-      // fall back to the listing's first address chain.
+      // Pin chainId to the network the signed-in address actually belongs to, so a later save writes
+      // the right network. The connected wallet may be a stored listing address OR one of the entity's
+      // five role addresses. If it isn't a stored address, resolve which network that role belongs to
+      // (do NOT guess the listing's first address - that picks the wrong network for multi-net providers).
       const mine = (p.addresses ?? []).find(
         (a: { address: string; chainId: number }) => a.address.toLowerCase() === addr.toLowerCase()
       );
-      if (mine) setChainId(mine.chainId);
-      else if (p.addresses?.[0]) setChainId(p.addresses[0].chainId);
+      if (mine) {
+        setChainId(mine.chainId);
+      } else {
+        try {
+          const rr = await fetch(`/api/provider/resolve-role?address=${addr.toLowerCase()}`);
+          const rb = await rr.json().catch(() => ({}));
+          if (rr.ok && Array.isArray(rb.roles) && rb.roles.length) {
+            setChainId(rb.roles[0].chainId);
+          }
+        } catch {
+          // Non-fatal: keep whatever chain was already pinned on connect.
+        }
+      }
       return true;
     } catch {
       // Non-fatal: fall back to an empty form.
