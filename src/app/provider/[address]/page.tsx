@@ -59,6 +59,21 @@ export default async function ProviderDetail({
       })
     : [];
 
+  // Per-validator stats (fee/uptime/connected) for this entity's node ids, joined by nodeId.
+  const validatorInfo =
+    metrics && metrics.nodeIds.length
+      ? await (await import("@/lib/validators")).validatorsForNodeIds(metrics.network, metrics.nodeIds)
+      : new Map();
+  const validators = (metrics?.nodeIds ?? []).map((id) => {
+    const v = validatorInfo.get(id);
+    return {
+      nodeId: id,
+      feePercent: v?.feePercent ?? null,
+      uptimePercent: v?.uptimePercent ?? null,
+      connected: v?.connected ?? null,
+    };
+  });
+
   // The full registered on-chain entity (all five role addresses) for each network this provider
   // is matched on, so the detail page can show the entity's complete on-chain identity.
   const lowerAddrs = addresses.map((a) => a.toLowerCase());
@@ -116,7 +131,7 @@ export default async function ProviderDetail({
     reward: formatWeiCompact(metrics?.delegatorReward ?? null),
     stakerReward: formatWeiCompact(metrics?.stakerReward ?? null),
     rewardEpoch: metrics?.lastEpoch ?? null,
-    nodeIds: metrics?.nodeIds ?? [],
+    validators,
     privateNode: !!p.privateNode,
     algorithm: p.algorithm,
     checks: (qual?.checks ?? []).map((c) => ({

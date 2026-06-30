@@ -4,6 +4,7 @@ import { publishFeedToRepo } from "@/lib/feed";
 import { evaluateQualification, purgeStaleProviders } from "@/lib/qualification";
 import { syncManagementGroup } from "@/lib/management-group";
 import { promoteDueLogos } from "@/lib/logo-review";
+import { ingestValidators } from "@/lib/validators";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,10 @@ export async function POST(req: NextRequest) {
       }
       case "promoteLogos": {
         const result = await promoteDueLogos();
+        return NextResponse.json({ ok: true, action, result });
+      }
+      case "ingestValidators": {
+        const result = await ingestValidators();
         return NextResponse.json({ ok: true, action, result });
       }
       default:

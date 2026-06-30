@@ -659,6 +659,7 @@ function SystemTab() {
           <Btn action="purge" label="Purge stale (dry run)" />
           <Btn action="purge" label="Purge stale (confirm)" confirm />
           <Btn action="promoteLogos" label="Promote due logos" />
+          <Btn action="ingestValidators" label="Ingest validators" />
         </div>
         <p className="mt-2 text-xs text-faint">
           These run the same library functions as the scheduled cron jobs.

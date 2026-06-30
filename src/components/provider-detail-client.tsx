@@ -29,7 +29,12 @@ export interface DetailData {
   reward: string | null;
   stakerReward: string | null;
   rewardEpoch: number | null;
-  nodeIds: string[];
+  validators: {
+    nodeId: string;
+    feePercent: number | null;
+    uptimePercent: number | null;
+    connected: boolean | null;
+  }[];
   privateNode: boolean;
   algorithm: string | null;
   checks: { key: string; label: string; status: "pass" | "fail" | "unknown"; detail: string }[];
@@ -279,17 +284,39 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
         </dl>
       )}
 
-      {/* Validators: the node IDs this entity manages (some providers run more than one). */}
-      {d.nodeIds.length > 0 && (
+      {/* Validators: each node this entity manages, with its staking fee, uptime and online status
+          (some providers run more than one). Stats are from the P-chain (getCurrentValidators). */}
+      {d.validators.length > 0 && (
         <section className="mt-8">
           <h2 className="mb-1 text-lg font-semibold">
-            {t("detail.validators")} ({d.nodeIds.length})
+            {t("detail.validators")} ({d.validators.length})
           </h2>
           <p className="mb-3 text-xs text-faint">{t("detail.validatorsNote")}</p>
           <ul className="surface divide-y divide-themed rounded-xl border text-sm">
-            {d.nodeIds.map((id) => (
-              <li key={id} className="px-4 py-3 font-mono text-xs break-all">
-                {id}
+            {d.validators.map((v) => (
+              <li key={v.nodeId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <span className="min-w-0 font-mono text-xs break-all">{v.nodeId}</span>
+                <span className="flex shrink-0 items-center gap-3 text-xs">
+                  {v.feePercent != null && (
+                    <span className="text-muted">
+                      {t("detail.valFee")} {v.feePercent.toFixed(2)}%
+                    </span>
+                  )}
+                  {v.uptimePercent != null && (
+                    <span className="text-muted">
+                      {t("detail.valUptime")} {v.uptimePercent.toFixed(2)}%
+                    </span>
+                  )}
+                  {v.connected != null && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 ${
+                        v.connected ? "bg-emerald-500/15 text-emerald-400" : "bg-flare/15 text-flare"
+                      }`}
+                    >
+                      {v.connected ? t("detail.valOnline") : t("detail.valOffline")}
+                    </span>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
