@@ -52,20 +52,23 @@ export function LinkNetworkPanel({
   // challenge for `chainId` and submit it. The link endpoint upserts the address as verified, so
   // this both LINKS a new network and VERIFIES an existing unverified row. `expectAddress`, when
   // given (the "Verify" action on a specific row), requires the connected wallet to be that address.
-  async function proveAddress(chainId: number, expectAddress?: string) {
+  // mode "link" = attach a NEW network address (needs an owner session first, S1). mode "verify" =
+  // prove an existing row already on the listing; the provider may sign with ANY of the entity's five
+  // on-chain role addresses (the server resolves the entity), so we do NOT pin the connected account.
+  async function proveAddress(chainId: number, mode: "link" | "verify" = "link") {
     setErr("");
     setMsg("");
     setBusy(true);
     try {
-      // Ownership of the target listing must be proven first: the server requires a session that is a
-      // verified owner before it will attach a new address (otherwise anyone could link themselves to
-      // any listing by name). So sign in with an address ALREADY on this listing, then sign with the
-      // address being linked/verified. For "Verify" on an existing row the same wallet may do both.
-      if (!expectAddress) {
+      // For a NEW address: prove listing ownership first (sign in with an address already on it), then
+      // sign with the new address. For "Verify" on an existing row: signing with any role address of
+      // that network's entity is itself the proof, so no sign-in and no account pinning.
+      if (mode === "link") {
         await signIn();
       }
-      // Signature from the address being linked/verified, on its own chain. For "Verify" on a specific
-      // row, the connected account must be that address.
+      const expectAddress = undefined;
+      // Signature on the target chain. For link, from the new address; for verify, from any role
+      // address of that network's entity.
       const { message, signature } = await connectAndSign({
         chainId,
         expectAddress,
@@ -183,7 +186,7 @@ export function LinkNetworkPanel({
                   {!a.verified && (
                     <button
                       type="button"
-                      onClick={() => proveAddress(a.chainId, a.address)}
+                      onClick={() => proveAddress(a.chainId, "verify")}
                       disabled={busy}
                       className="text-xs text-beacon underline-offset-2 hover:underline disabled:opacity-50"
                     >

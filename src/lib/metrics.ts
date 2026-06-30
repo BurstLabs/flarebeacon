@@ -142,6 +142,38 @@ export async function signerControlsProvider(
 }
 
 /**
+ * Resolve a signer to the on-chain entity it is any of the five roles of, on a given network, and
+ * return that entity's CANONICAL listing address for the network (its delegation address, falling
+ * back to the voter). This lets a provider prove control of a network by signing with ANY of its five
+ * role addresses, not only the one address stored on the listing. Returns null if the signer is not a
+ * role of any entity on that network.
+ */
+export async function resolveEntityListingAddress(
+  signer: string,
+  network: string
+): Promise<{ listingAddress: string; voter: string } | null> {
+  const s = signer.toLowerCase();
+  const oc = await prisma.providerOnchain.findFirst({
+    where: {
+      network,
+      OR: [
+        { voter: s },
+        { delegationAddress: s },
+        { submitAddress: s },
+        { submitSignaturesAddress: s },
+        { signingPolicyAddress: s },
+      ],
+    },
+    select: { voter: true, delegationAddress: true },
+  });
+  if (!oc) return null;
+  return {
+    listingAddress: (oc.delegationAddress ?? oc.voter).toLowerCase(),
+    voter: oc.voter.toLowerCase(),
+  };
+}
+
+/**
  * Batch: map providerId -> metrics for a list of providers (each with its addresses). One
  * query per provider; fine for a directory page of ~150 rows, can be optimised later.
  */

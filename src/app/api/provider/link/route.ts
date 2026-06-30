@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyChallenge } from "@/lib/auth";
-import { isRegisteredOnchain } from "@/lib/metrics";
+import { isRegisteredOnchain, resolveEntityListingAddress } from "@/lib/metrics";
 import { getChain } from "@/lib/chains";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
@@ -65,6 +65,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // The signer may use ANY of the entity's five on-chain role addresses (identity/submit/submit-sigs/
+  // signing-policy/delegation) to prove control of this network, not only the delegation address that
+  // is stored on the listing. Resolve the signer to its entity and use that entity's CANONICAL listing
+  // address (delegation, or voter) as the address to verify/list. On mainnet the entity is known on
+  // -chain; on testnets (no ingested entity) fall back to the signer itself.
+  const resolved = chainB.mainnet
+    ? await resolveEntityListingAddress(addressB, chainB.key)
+    : null;
+  const listingAddress = resolved?.listingAddress ?? addressB;
+
   // Find the target listing by name (shared normaliser, S14), and require it to already be claimed.
   const { normalizeName } = await import("@/lib/validation");
   const candidates = await prisma.provider.findMany({
@@ -87,13 +97,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Authorization. Two legitimate cases, both safe:
-  //   (a) VERIFY AN EXISTING ROW: the signing address B is already on this listing (e.g. a claimed-
-  //       but-unproven second network). Signing AS that address is itself the proof - no separate
-  //       owner session is needed.
-  //   (b) LINK A NEW ADDRESS: B is not yet on the listing. This is the takeover-sensitive path (S1),
+  //   (a) VERIFY AN EXISTING ROW: the resolved listing address is already on this listing (e.g. a
+  //       claimed-but-unproven second network). Signing as any of that entity's role addresses is
+  //       itself the proof - no separate owner session is needed.
+  //   (b) LINK A NEW ADDRESS: it is not yet on the listing. This is the takeover-sensitive path (S1),
   //       so it requires an authenticated session that is already a VERIFIED owner of the listing.
   const bAlreadyOnListing = ownedA.addresses.some(
-    (a) => a.address.toLowerCase() === addressB.toLowerCase()
+    (a) => a.address.toLowerCase() === listingAddress.toLowerCase()
   );
   if (!bAlreadyOnListing) {
     const sessionAddr = (await getSessionAddress())?.toLowerCase() ?? null;
@@ -114,10 +124,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // If address B already belongs to a DIFFERENT provider, only allow the merge when that record
-  // is an unclaimed import (no verified address). A claimed listing is never absorbed.
+  // If the canonical listing address already belongs to a DIFFERENT provider, only allow the merge
+  // when that record is an unclaimed import (no verified address). A claimed listing is never absorbed.
   const existingB = await prisma.providerAddress.findUnique({
-    where: { chainId_address: { chainId: chainIdB, address: addressB } },
+    where: { chainId_address: { chainId: chainIdB, address: listingAddress } },
     select: {
       providerId: true,
       provider: { select: { addresses: { select: { verified: true } } } },
@@ -127,26 +137,26 @@ export async function POST(req: NextRequest) {
     const otherIsClaimed = existingB.provider.addresses.some((a) => a.verified);
     if (otherIsClaimed) {
       return NextResponse.json(
-        { error: `address ${addressB} already belongs to a claimed listing` },
+        { error: `address ${listingAddress} already belongs to a claimed listing` },
         { status: 409 }
       );
     }
   }
 
   await prisma.$transaction(async (tx) => {
-    // Attach B (verified, listed) to the caller's provider. If B was an unclaimed import under a
-    // different provider, move it over; clean up that now-empty imported provider.
+    // Attach the canonical listing address (verified, listed) to the caller's provider. If it was an
+    // unclaimed import under a different provider, move it over; clean up that now-empty provider.
     const orphanProviderId =
       existingB && existingB.providerId !== ownedA.id
         ? existingB.providerId
         : null;
 
     await tx.providerAddress.upsert({
-      where: { chainId_address: { chainId: chainIdB, address: addressB } },
+      where: { chainId_address: { chainId: chainIdB, address: listingAddress } },
       create: {
         providerId: ownedA.id,
         chainId: chainIdB,
-        address: addressB,
+        address: listingAddress,
         verified: true,
         verifiedAt: new Date(),
         listed: true,
@@ -170,5 +180,5 @@ export async function POST(req: NextRequest) {
   });
 
   await publishFeedToRepo();
-  return NextResponse.json({ ok: true, linked: { chainId: chainIdB, address: addressB } });
+  return NextResponse.json({ ok: true, linked: { chainId: chainIdB, address: listingAddress } });
 }
