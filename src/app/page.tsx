@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getChain } from "@/lib/chains";
-import { metricsForProviders, formatFee, formatWeiCompact } from "@/lib/metrics";
+import { metricsForProviders, formatWeiCompact } from "@/lib/metrics";
 import { qualifyProviders, latchedQualifiedByAddresses } from "@/lib/qualification";
 import { DirectoryClient, type CardProvider } from "@/components/directory-client";
 
@@ -59,6 +59,14 @@ export default async function Home({
   const { managementGroupByProvider } = await import("@/lib/management-group");
   const mgByProvider = await managementGroupByProvider();
 
+  // Batch-load per-validator stats (fee/connected) for every node across all shown providers in one
+  // query, then map per provider for the card validator list.
+  const allNodeIds = Array.from(new Set([...metrics.values()].flatMap((m) => m.nodeIds)));
+  const validatorRows = allNodeIds.length
+    ? await prisma.providerValidator.findMany({ where: { nodeId: { in: allNodeIds } } })
+    : [];
+  const validatorByNode = new Map(validatorRows.map((v) => [v.nodeId, v]));
+
   const cards: CardProvider[] = shown.map((p) => {
     const m = metrics.get(p.id);
     const q = qualifications.get(p.id);
@@ -80,11 +88,17 @@ export default async function Home({
             caseId: govByProvider.get(p.id)!.caseId,
           }
         : null,
-      fee: formatFee(m?.feeBips ?? null),
       votePower: formatWeiCompact(m?.wNatWeight ?? null),
       reward: formatWeiCompact(m?.delegatorReward ?? null),
       rewardEpoch: m?.lastEpoch ?? null,
-      validators: m?.nodeIds.length ?? 0,
+      validators: (m?.nodeIds ?? []).map((id) => {
+        const v = validatorByNode.get(id);
+        return {
+          nodeId: id,
+          feePercent: v?.feePercent ?? null,
+          connected: v?.connected ?? null,
+        };
+      }),
       checks: (q?.checks ?? []).map((c) => ({
         key: c.key,
         label: c.label,

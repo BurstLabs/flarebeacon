@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getChain } from "@/lib/chains";
-import { metricsForProvider, formatFee, formatWeiCompact, listingAddressesForSigner } from "@/lib/metrics";
+import { metricsForProvider, formatWeiCompact, listingAddressesForSigner } from "@/lib/metrics";
 import { qualifyProviders, latchedQualifiedByAddresses } from "@/lib/qualification";
 import { ProviderDetailClient, type DetailData } from "@/components/provider-detail-client";
 
@@ -124,7 +124,6 @@ export default async function ProviderDetail({
       (await (await import("@/lib/governance")).inNewProviderWindow(p.createdAt, new Date())),
     qualified: latchedMap.get(p.id) ?? false,
     network: metrics?.network ?? null,
-    fee: formatFee(metrics?.feeBips ?? null),
     votePower: formatWeiCompact(metrics?.wNatWeight ?? null),
     votePowerCapped: formatWeiCompact(metrics?.wNatCappedWeight ?? null),
     feedCount: metrics?.feedCount ?? null,

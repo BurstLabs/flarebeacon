@@ -22,7 +22,6 @@ export interface DetailData {
   flaggable: boolean;
   qualified: boolean;
   network: string | null;
-  fee: string | null;
   votePower: string | null;
   votePowerCapped: string | null;
   feedCount: number | null;
@@ -248,15 +247,10 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
       {/* Management Group flag action (new providers only, when not already under review). */}
       {d.flaggable && !d.governance?.underReview && <FlagAction providerId={d.providerId} />}
 
-      {/* Metrics */}
-      {(d.fee || d.votePower || d.reward) && (
+      {/* Metrics (the FTSO delegation fee is intentionally not shown - the validator fee, shown per
+          node in the Validators section, is the relevant one). */}
+      {(d.votePower || d.reward) && (
         <dl className="surface mt-6 grid grid-cols-2 gap-4 rounded-xl border p-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          {d.fee && (
-            <div>
-              <dt className="text-faint">{t("card.fee")}</dt>
-              <dd className="font-medium">{d.fee}</dd>
-            </div>
-          )}
           {d.votePower && (
             <div>
               <dt className="text-faint">{t("card.votePower")}</dt>

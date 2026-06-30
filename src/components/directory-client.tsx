@@ -22,11 +22,10 @@ export interface CardProvider {
   managementGroup: boolean;
   verified: boolean;
   governance: { pending: boolean; underReview: boolean; suspended: boolean; caseId: string | null } | null;
-  fee: string | null;
   votePower: string | null;
   reward: string | null;
   rewardEpoch: number | null;
-  validators: number;
+  validators: { nodeId: string; feePercent: number | null; connected: boolean | null }[];
   checks: CardCheck[];
   chains: string[];
   privateNode: boolean;
@@ -223,14 +222,8 @@ export function DirectoryClient({
 
                 <p className="mt-3 line-clamp-3 text-sm text-muted">{p.description}</p>
 
-                {(p.fee || p.votePower || p.reward || p.validators > 0) && (
-                  <dl className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
-                    {p.fee && (
-                      <div>
-                        <dt className="text-faint">{t("card.fee")}</dt>
-                        <dd className="font-medium">{p.fee}</dd>
-                      </div>
-                    )}
+                {(p.votePower || p.reward) && (
+                  <dl className="mt-4 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
                     {p.votePower && (
                       <div>
                         <dt className="text-faint">{t("card.votePower")}</dt>
@@ -245,13 +238,36 @@ export function DirectoryClient({
                         <dd className="font-medium">{p.reward}</dd>
                       </div>
                     )}
-                    {p.validators > 0 && (
-                      <div>
-                        <dt className="text-faint">{t("card.validators")}</dt>
-                        <dd className="font-medium">{p.validators}</dd>
-                      </div>
-                    )}
                   </dl>
+                )}
+
+                {/* Validators: compact per-node list (NodeID + fee + online dot). */}
+                {p.validators.length > 0 && (
+                  <div className="mt-4">
+                    <p className="mb-1 text-xs text-faint">
+                      {t("card.validators")} ({p.validators.length})
+                    </p>
+                    <ul className="space-y-1 text-xs">
+                      {p.validators.map((v) => (
+                        <li key={v.nodeId} className="flex items-center justify-between gap-2">
+                          <span className="min-w-0 truncate font-mono">{v.nodeId}</span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            {v.feePercent != null && (
+                              <span className="text-muted">{v.feePercent.toFixed(2)}%</span>
+                            )}
+                            {v.connected != null && (
+                              <span
+                                title={v.connected ? t("detail.valOnline") : t("detail.valOffline")}
+                                className={`inline-block h-2 w-2 rounded-full ${
+                                  v.connected ? "bg-emerald-400" : "bg-flare"
+                                }`}
+                              />
+                            )}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
 
                 {/* Checklist only for non-qualified cards (shows what's missing). Qualified ones
