@@ -5,6 +5,7 @@ import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
 import { apiError } from "@/lib/api-error";
 import { normalizeName } from "@/lib/validation";
+import { listingAddressesForSigner } from "@/lib/metrics";
 
 // POST /api/provider/delete  -> permanently remove the caller's ENTIRE listing.
 //
@@ -28,9 +29,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "name confirmation is required" }, { status: 400 });
   }
 
-  // The listing the caller owns (holds the session address).
+  // The listing the caller owns. The session may be a stored listing address OR any of the entity's
+  // five on-chain role addresses, so match by the session plus its full role set.
+  const ownerKeys = [session.toLowerCase(), ...(await listingAddressesForSigner(session))];
   const owned = await prisma.providerAddress.findFirst({
-    where: { address: session },
+    where: { address: { in: ownerKeys } },
     select: { providerId: true, provider: { select: { name: true } } },
   });
   if (!owned) {

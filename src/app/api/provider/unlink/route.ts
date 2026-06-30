@@ -4,6 +4,7 @@ import { getSessionAddress } from "@/lib/session";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
 import { apiError } from "@/lib/api-error";
+import { listingAddressesForSigner } from "@/lib/metrics";
 
 // POST /api/provider/unlink  -> remove an address from the caller's listing.
 //
@@ -29,9 +30,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "chainId and address are required" }, { status: 400 });
   }
 
-  // The listing the caller owns (holds the session address).
+  // The listing the caller owns. The session may be a stored listing address OR any of the entity's
+  // five on-chain role addresses, so match by the session plus its full role set.
+  const ownerKeys = [session.toLowerCase(), ...(await listingAddressesForSigner(session))];
   const owned = await prisma.providerAddress.findFirst({
-    where: { address: session },
+    where: { address: { in: ownerKeys } },
     select: { providerId: true },
   });
   if (!owned) {

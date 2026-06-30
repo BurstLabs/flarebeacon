@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getSessionAddress } from "@/lib/session";
 import { commitPendingLogo, uploadsEnabled } from "@/lib/github";
 import { pendingLogoRawURL } from "@/lib/logos";
+import { listingAddressesForSigner } from "@/lib/metrics";
 import { validateLogoStrict } from "@/lib/png";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
@@ -60,12 +61,14 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const goLiveAt = logoGoLiveAt(now);
 
-  // If a provider record already exists for this address, record the PENDING logo and treat the
-  // upload as a claim NOW (verified/listed/owner-owned) - only the image is deferred, not ownership.
-  // The live logoURI is left untouched so the current logo keeps showing until promotion. For a brand
-  // -new listing there's no record yet; we return the pending URL and go-live date for the client.
+  // If a provider record already exists for an address the caller controls, record the PENDING logo
+  // and treat the upload as a claim NOW (verified/listed/owner-owned) - only the image is deferred,
+  // not ownership. The live logoURI is left untouched so the current logo keeps showing until
+  // promotion. The session may be a stored listing address OR any of the entity's five role addresses,
+  // so match by the session plus its full role set. For a brand-new listing there's no record yet.
+  const ownerKeys = [session.toLowerCase(), ...(await listingAddressesForSigner(session))];
   const sessionAddr = await prisma.providerAddress.findFirst({
-    where: { address: session },
+    where: { address: { in: ownerKeys } },
     select: { id: true, providerId: true },
   });
   let providerName = "(new listing)";
