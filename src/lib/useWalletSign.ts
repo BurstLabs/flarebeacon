@@ -108,7 +108,11 @@ export function useWalletSign(t: TFn) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ address, chainId: opts.chainId }),
       });
-      if (!nonceRes.ok) throw new Error(t("submit.err.noChallenge"));
+      if (!nonceRes.ok) {
+        // Distinguish rate-limiting from a generic failure so the user knows to wait, not retry.
+        if (nonceRes.status === 429) throw new Error(t("submit.err.rateLimited"));
+        throw new Error(t("submit.err.noChallenge"));
+      }
       const { message } = await nonceRes.json();
 
       let signature: string;

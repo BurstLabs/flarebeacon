@@ -10,7 +10,7 @@ const bodySchema = z.object({ address: addressSchema, chainId: chainIdSchema });
 // Issues a SIWE challenge the wallet must sign. address is returned to the client in the
 // message in EIP-55 form (SIWE requirement).
 export async function POST(req: NextRequest) {
-  const limited = rateLimit(req, "auth", 20, 60_000); // 20/min/IP
+  const limited = rateLimit(req, "auth", 40, 60_000); // 40/min/IP (multi-step flows make several)
   if (limited) return limited;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
