@@ -28,7 +28,8 @@ export function LinkNetworkPanel({
   const connectAndSign = useWalletSign(t);
   const options = CHAINS.filter((c) => c.chainId !== excludeChainId);
   const [linkChainId, setLinkChainId] = useState<number>(options[0]?.chainId ?? 19);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false); // a "link a new network" action is in progress
+  const [verifyingKey, setVerifyingKey] = useState<string>(""); // which existing row is being verified
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [removing, setRemoving] = useState<string>("");
@@ -58,7 +59,10 @@ export function LinkNetworkPanel({
   async function proveAddress(chainId: number, mode: "link" | "verify" = "link") {
     setErr("");
     setMsg("");
-    setBusy(true);
+    // Track loading on the control actually clicked, so the link button doesn't show "Linking..." when
+    // a row's Verify is running, and vice versa.
+    if (mode === "verify") setVerifyingKey(`${chainId}`);
+    else setBusy(true);
     try {
       // For a NEW address: prove listing ownership first (sign in with an address already on it), then
       // sign with the new address. For "Verify" on an existing row: signing with any role address of
@@ -66,14 +70,9 @@ export function LinkNetworkPanel({
       if (mode === "link") {
         await signIn();
       }
-      const expectAddress = undefined;
       // Signature on the target chain. For link, from the new address; for verify, from any role
       // address of that network's entity.
-      const { message, signature } = await connectAndSign({
-        chainId,
-        expectAddress,
-        expectAddressErrorKey: "submit.err.wrongAccount",
-      });
+      const { message, signature } = await connectAndSign({ chainId });
 
       const res = await fetch("/api/provider/link", {
         method: "POST",
@@ -82,14 +81,12 @@ export function LinkNetworkPanel({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(
-          apiErrorMessage(t, body, "submit.err.linkFailed")
-        );
+        throw new Error(apiErrorMessage(t, body, "submit.err.linkFailed"));
       }
       const chainName =
         CHAINS.find((c) => c.chainId === chainId)?.name ?? t("submit.fallback.network");
       setMsg(
-        expectAddress
+        mode === "verify"
           ? t("submit.verify.ok", { network: chainName })
           : t("submit.link.ok", { network: chainName })
       );
@@ -98,6 +95,7 @@ export function LinkNetworkPanel({
       setErr(e instanceof Error ? e.message : t("submit.err.linkFailed"));
     } finally {
       setBusy(false);
+      setVerifyingKey("");
     }
   }
 
@@ -195,10 +193,12 @@ export function LinkNetworkPanel({
                     <button
                       type="button"
                       onClick={() => proveAddress(a.chainId, "verify")}
-                      disabled={busy}
+                      disabled={verifyingKey === `${a.chainId}` || busy}
                       className="text-xs text-beacon underline-offset-2 hover:underline disabled:opacity-50"
                     >
-                      {t("submit.verify.button")}
+                      {verifyingKey === `${a.chainId}`
+                        ? t("submit.verify.verifying")
+                        : t("submit.verify.button")}
                     </button>
                   )}
                   <button
