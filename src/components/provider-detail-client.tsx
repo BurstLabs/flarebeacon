@@ -215,10 +215,22 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
       </a>
 
       <ManageListingButton
-        ownerAddresses={d.addresses.filter((a) => a.verified).map((a) => a.address.toLowerCase())}
-        // Claiming/managing may be done with ANY of the entity's five on-chain role addresses
-        // (identity/submit/submit-signatures/signing-policy/delegation), not only the address stored
-        // on the listing. Include the listing addresses plus all five roles per matched network.
+        // Managing a claimed listing may be done with ANY of the five on-chain role addresses of a
+        // network that has a verified address - not only the stored verified address. Include each
+        // verified listing address, plus all five roles of every entity that owns a verified address.
+        ownerAddresses={(() => {
+          const verified = new Set(
+            d.addresses.filter((a) => a.verified).map((a) => a.address.toLowerCase())
+          );
+          const out = new Set<string>(verified);
+          for (const e of d.entityAddresses) {
+            const roles = e.roles.map((r) => r.address.toLowerCase());
+            if (roles.some((r) => verified.has(r))) roles.forEach((r) => out.add(r));
+          }
+          return [...out];
+        })()}
+        // Claiming an unclaimed listing may be done with ANY of the entity's five role addresses, not
+        // only the address stored on the listing.
         claimAddresses={[
           ...d.addresses.map((a) => a.address.toLowerCase()),
           ...d.entityAddresses.flatMap((e) => e.roles.map((r) => r.address.toLowerCase())),
