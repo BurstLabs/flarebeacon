@@ -115,6 +115,15 @@ export async function POST(req: NextRequest) {
   const resolved = chainB.mainnet ? await resolveEntityListingAddress(addressB, chainB.key) : null;
   const listingAddress = existingRow?.address.toLowerCase() ?? resolved?.listingAddress ?? addressB;
 
+  // This network is already verified on the listing - nothing to link or verify. (The UI hides it from
+  // the dropdown; this is the server-side guard.)
+  if (existingRow?.verified) {
+    return NextResponse.json(
+      { error: `${chainB.name} is already verified on this listing.`, code: "NETWORK_ALREADY_LINKED" },
+      { status: 409 }
+    );
+  }
+
   // Authorization (simplified per product decision). The listing must already be claimed (checked
   // above: it has a verified owner). To either VERIFY an existing row or LINK a new network, the signer
   // proves control of THAT network by signing with any of its entity's five on-chain role addresses

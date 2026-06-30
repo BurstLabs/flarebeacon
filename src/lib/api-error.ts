@@ -39,7 +39,8 @@ export type ApiErrorCode =
   | "NAME_TAKEN"
   | "ADDRESS_OTHER_LISTING"
   | "ADDRESS_NOT_ON_LISTING"
-  | "TESTNET_NOT_SUPPORTED";
+  | "TESTNET_NOT_SUPPORTED"
+  | "NETWORK_ALREADY_LINKED";
 
 // The map from code to the i18n key the client should render. Kept here so server and client agree.
 export const API_ERROR_I18N: Record<ApiErrorCode, string> = {
@@ -69,6 +70,7 @@ export const API_ERROR_I18N: Record<ApiErrorCode, string> = {
   ADDRESS_OTHER_LISTING: "apiErr.addressOtherListing",
   ADDRESS_NOT_ON_LISTING: "apiErr.addressNotOnListing",
   TESTNET_NOT_SUPPORTED: "apiErr.testnetNotSupported",
+  NETWORK_ALREADY_LINKED: "apiErr.networkAlreadyLinked",
 };
 
 // Helper to build a coded error response: { error, code }, with the given HTTP status.

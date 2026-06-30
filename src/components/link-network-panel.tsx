@@ -26,9 +26,14 @@ export function LinkNetworkPanel({
   const { t } = useApp();
   const router = useRouter();
   const connectAndSign = useWalletSign(t);
-  // Only mainnet networks are listable (testnets have no verifiable on-chain entity data).
-  const options = CHAINS.filter((c) => c.mainnet && c.chainId !== excludeChainId);
-  const [linkChainId, setLinkChainId] = useState<number>(options[0]?.chainId ?? 19);
+  // Only mainnet networks are listable (testnets have no verifiable on-chain entity data), and a
+  // network already on this listing cannot be linked again - offer only the ones not yet present.
+  const presentChainIds = new Set<number>([
+    ...(excludeChainId != null ? [excludeChainId] : []),
+    ...addresses.map((a) => a.chainId),
+  ]);
+  const options = CHAINS.filter((c) => c.mainnet && !presentChainIds.has(c.chainId));
+  const [linkChainId, setLinkChainId] = useState<number>(options[0]?.chainId ?? 0);
   const [busy, setBusy] = useState(false); // a "link a new network" action is in progress
   const [verifyingKey, setVerifyingKey] = useState<string>(""); // which existing row is being verified
   const [err, setErr] = useState("");
@@ -137,32 +142,39 @@ export function LinkNetworkPanel({
   return (
     <div className="rounded border border-themed bg-elev/50 p-4 text-sm">
       <p className="font-medium">{t("submit.link.title")}</p>
-      <p className="mt-1 text-muted">{t("submit.link.body")}</p>
-      <p className="mt-2 text-xs text-faint">{t("submit.link.accountHint")}</p>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="text-xs text-muted">
-          {t("submit.network")}
-          <select
-            value={linkChainId}
-            onChange={(e) => setLinkChainId(Number(e.target.value))}
-            className="mt-1 block rounded border border-themed bg-elev px-3 py-2 text-sm"
-          >
-            {options.map((c) => (
-              <option key={c.chainId} value={c.chainId}>
-                {c.name} ({t("submit.chainIdLabel")} {c.chainId})
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={() => proveAddress(linkChainId)}
-          disabled={busy}
-          className="rounded-lg border border-beacon px-4 py-2 text-sm font-medium text-beacon transition hover:bg-beacon/10 disabled:opacity-50"
-        >
-          {busy ? t("submit.link.linking") : t("submit.link.button")}
-        </button>
-      </div>
+      {options.length === 0 ? (
+        // Every listable (mainnet) network is already on this listing.
+        <p className="mt-1 text-muted">{t("submit.link.allLinked")}</p>
+      ) : (
+        <>
+          <p className="mt-1 text-muted">{t("submit.link.body")}</p>
+          <p className="mt-2 text-xs text-faint">{t("submit.link.accountHint")}</p>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <label className="text-xs text-muted">
+              {t("submit.network")}
+              <select
+                value={linkChainId}
+                onChange={(e) => setLinkChainId(Number(e.target.value))}
+                className="mt-1 block rounded border border-themed bg-elev px-3 py-2 text-sm"
+              >
+                {options.map((c) => (
+                  <option key={c.chainId} value={c.chainId}>
+                    {c.name} ({t("submit.chainIdLabel")} {c.chainId})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => proveAddress(linkChainId)}
+              disabled={busy}
+              className="rounded-lg border border-beacon px-4 py-2 text-sm font-medium text-beacon transition hover:bg-beacon/10 disabled:opacity-50"
+            >
+              {busy ? t("submit.link.linking") : t("submit.link.button")}
+            </button>
+          </div>
+        </>
+      )}
       {addresses.length > 1 && (
         <div className="mt-4 border-t border-themed pt-3">
           <p className="text-xs text-faint">{t("submit.unlink.heading")}</p>
