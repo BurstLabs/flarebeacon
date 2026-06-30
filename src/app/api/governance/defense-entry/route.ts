@@ -7,6 +7,7 @@ import { imageBuffersFromForm, storePointImageBatch, removePointImages } from "@
 import { randomUUID } from "crypto";
 import { apiError } from "@/lib/api-error";
 import { signerControlsProvider } from "@/lib/metrics";
+import { targetBelongsToCase } from "@/lib/governance";
 
 // Parse JSON, or multipart (text + images + base64 auth) when images are attached on creation.
 async function readBody(req: NextRequest) {
@@ -71,11 +72,21 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  // A reply target (used only when creating a new entry) must belong to THIS case (S18).
+  if (replyToRef) {
+    const [refType, refId] = replyToRef.split(":");
+    if (!(await targetBelongsToCase(refType, refId, caseId))) {
+      return NextResponse.json({ error: "invalid reply target" }, { status: 400 });
+    }
+  }
   if (text.length > 4000) {
     return NextResponse.json({ error: "response must be at most 4000 characters" }, { status: 400 });
   }
   if (!isClean(text)) {
     return NextResponse.json({ error: "response contains inappropriate language" }, { status: 400 });
+  }
+  if (title && !isClean(title)) {
+    return NextResponse.json({ error: "title contains inappropriate language" }, { status: 400 });
   }
 
   const verified = await verifyChallenge(message, signature);

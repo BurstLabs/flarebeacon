@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
   if (statement && (statement.length > 2000 || !isClean(statement))) {
     return NextResponse.json({ error: "statement too long or inappropriate" }, { status: 400 });
   }
+  if (title && !isClean(title)) {
+    return NextResponse.json({ error: "title contains inappropriate language" }, { status: 400 });
+  }
 
   // The signer must control a verified address on this provider.
   const verified = await verifyChallenge(message, signature);
@@ -114,7 +117,18 @@ export async function POST(req: NextRequest) {
 
   // Open the appeal IMMEDIATELY: a fresh re-vote case straight into discussion, then voting.
   const deadlines = caseDeadlines(now);
-  const created = await prisma.$transaction(async (tx) => {
+  let created;
+  try {
+    created = await prisma.$transaction(async (tx) => {
+    // Re-check inside the transaction so two concurrent appeal requests can't both create a case
+    // (S19): if any appeal now exists for this provider, abort.
+    const existingAppeal = await tx.providerFlagCase.findFirst({
+      where: { providerId, isReVote: true },
+      select: { id: true },
+    });
+    if (existingAppeal) {
+      throw new Error("APPEAL_EXISTS");
+    }
     const appeal = await tx.providerFlagCase.create({
       data: {
         providerId,
@@ -138,7 +152,13 @@ export async function POST(req: NextRequest) {
       });
     }
     return appeal;
-  });
+    });
+  } catch (e) {
+    if (e instanceof Error && e.message === "APPEAL_EXISTS") {
+      return NextResponse.json({ error: "an appeal is already in progress" }, { status: 409 });
+    }
+    throw e;
+  }
 
   await publishFeedToRepo();
   return NextResponse.json({ ok: true, caseId: created.id });

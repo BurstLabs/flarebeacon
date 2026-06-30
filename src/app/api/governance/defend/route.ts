@@ -67,6 +67,9 @@ export async function POST(req: NextRequest) {
   if (!isClean(text)) {
     return apiError("INAPPROPRIATE_LANGUAGE", "defense contains inappropriate language", 400);
   }
+  if (title && !isClean(title)) {
+    return apiError("INAPPROPRIATE_LANGUAGE", "title contains inappropriate language", 400);
+  }
 
   // Verify the signature and recover the signing address.
   const verified = await verifyChallenge(message, signature);

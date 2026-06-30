@@ -4,6 +4,7 @@ import { getSessionAddress } from "@/lib/session";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
 import { apiError } from "@/lib/api-error";
+import { normalizeName } from "@/lib/validation";
 
 // POST /api/provider/delete  -> permanently remove the caller's ENTIRE listing.
 //
@@ -37,8 +38,8 @@ export async function POST(req: NextRequest) {
   }
 
   // The confirmation name must match the listing exactly (case/space-insensitive).
-  const norm = (s: string) => s.trim().toLowerCase();
-  if (norm(confirmName) !== norm(owned.provider.name)) {
+  // Use the shared name normaliser (S14: one rule everywhere a name is compared).
+  if (normalizeName(confirmName) !== normalizeName(owned.provider.name)) {
     return NextResponse.json(
       { error: `the name does not match your listing ("${owned.provider.name}")` },
       { status: 409 }

@@ -57,9 +57,15 @@ export function LinkNetworkPanel({
     setMsg("");
     setBusy(true);
     try {
-      // Single signature, from the address being linked/verified, on its own chain. The server
-      // matches the listing by name and requires it to already have a verified owner, so no separate
-      // sign-in is needed. For "Verify" on a specific row, the connected account must be that address.
+      // Ownership of the target listing must be proven first: the server requires a session that is a
+      // verified owner before it will attach a new address (otherwise anyone could link themselves to
+      // any listing by name). So sign in with an address ALREADY on this listing, then sign with the
+      // address being linked/verified. For "Verify" on an existing row the same wallet may do both.
+      if (!expectAddress) {
+        await signIn();
+      }
+      // Signature from the address being linked/verified, on its own chain. For "Verify" on a specific
+      // row, the connected account must be that address.
       const { message, signature } = await connectAndSign({
         chainId,
         expectAddress,

@@ -65,3 +65,46 @@ export function validateLogo(buf: Buffer): LogoValidation {
   }
   return { ok: true };
 }
+
+// True if the buffer has trailing bytes after the PNG IEND chunk. A valid PNG ends with the 12-byte
+// IEND chunk (length 0 + "IEND" + CRC); anything after it is a polyglot/appended payload (S13).
+function hasTrailingAfterIend(buf: Buffer): boolean {
+  const idx = buf.lastIndexOf(Buffer.from("IEND", "ascii"));
+  if (idx < 0) return true; // no IEND at all -> not a well-formed PNG
+  // IEND chunk = [4-byte type at idx] + [4-byte CRC]; the chunk's last byte is at idx+3+4 = idx+7.
+  const endOfPng = idx + 4 + 4;
+  return buf.length > endOfPng;
+}
+
+/**
+ * Full-decode logo validation (S13): runs the cheap header checks, rejects any bytes after IEND, then
+ * actually decodes the image with sharp to confirm it is a real, non-truncated PNG and enforces the
+ * alpha-channel requirement. Async because it decodes. Use this on upload.
+ */
+export async function validateLogoStrict(buf: Buffer): Promise<LogoValidation> {
+  const basic = validateLogo(buf);
+  if (!basic.ok) return basic;
+  if (hasTrailingAfterIend(buf)) {
+    return { ok: false, error: "logo has unexpected trailing data after the image" };
+  }
+  try {
+    const sharp = (await import("sharp")).default;
+    const meta = await sharp(buf, { failOn: "error" }).metadata();
+    if (meta.format !== "png") return { ok: false, error: "logo must be a PNG" };
+    if (!meta.hasAlpha) {
+      return { ok: false, error: "logo must have an alpha (transparency) channel" };
+    }
+    if (
+      meta.width == null ||
+      meta.height == null ||
+      meta.width !== meta.height ||
+      meta.width < LOGO_MIN_DIM ||
+      meta.width > LOGO_MAX_DIM
+    ) {
+      return { ok: false, error: "logo dimensions are invalid" };
+    }
+  } catch {
+    return { ok: false, error: "logo is not a valid, decodable PNG" };
+  }
+  return { ok: true };
+}

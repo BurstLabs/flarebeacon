@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 //   syncManagement   -> refresh Management Group membership from chain (then republish)
 //   purge            -> purge stale providers (dry-run unless confirm=true)
 export async function POST(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireAdmin(req);
   if (denied) return denied;
   const b = await req.json().catch(() => null);
   const action = typeof b?.action === "string" ? b.action : null;
@@ -44,9 +44,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "unknown action" }, { status: 400 });
     }
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "action failed" },
-      { status: 500 }
-    );
+    // Log the detail server-side; return a generic message so internal paths/DB errors are not
+    // surfaced to the client (S16).
+    console.error(`admin/system action "${action}" failed:`, e);
+    return NextResponse.json({ error: "action failed" }, { status: 500 });
   }
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSessionAddress } from "@/lib/session";
 import { commitLogo, uploadsEnabled } from "@/lib/github";
-import { validateLogo } from "@/lib/png";
+import { validateLogoStrict } from "@/lib/png";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
 import { apiError } from "@/lib/api-error";
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   const buf = Buffer.from(await file.arrayBuffer());
-  const check = validateLogo(buf);
+  const check = await validateLogoStrict(buf);
   if (!check.ok) {
     return NextResponse.json({ error: check.error }, { status: 400 });
   }

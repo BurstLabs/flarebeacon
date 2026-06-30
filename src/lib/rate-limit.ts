@@ -19,12 +19,20 @@ function sweep(now: number) {
   for (const [k, v] of buckets) if (v.resetAt <= now) buckets.delete(k);
 }
 
+// Resolve the client IP for rate-limit keying. The site sits behind Cloudflare, which sets
+// CF-Connecting-IP itself (clients cannot forge it). X-Forwarded-For IS client-spoofable, so it is
+// only trusted when TRUST_XFF=1 (for a deployment genuinely behind a different trusted proxy).
+// Otherwise a single shared "direct" key is used so spoofing XFF can't mint unlimited fresh buckets
+// to bypass the limit (S9). Returning a constant on the fallback path makes the limiter strictly
+// safe-by-default: at worst it over-limits direct (non-CF) traffic rather than under-limiting it.
 export function clientIp(req: NextRequest): string {
   const cf = req.headers.get("cf-connecting-ip");
   if (cf) return cf;
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return "unknown";
+  if (process.env.TRUST_XFF === "1") {
+    const xff = req.headers.get("x-forwarded-for");
+    if (xff) return xff.split(",")[0].trim();
+  }
+  return "direct";
 }
 
 /**

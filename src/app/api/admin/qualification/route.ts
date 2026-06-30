@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
 // PATCH /api/admin/qualification  { network, voter, qualified }  -> override the latched qualified flag.
 export async function PATCH(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireAdmin(req);
   if (denied) return denied;
   const b = await req.json().catch(() => null);
   const network = typeof b?.network === "string" ? b.network : null;

@@ -5,6 +5,7 @@ import { isRegisteredOnchain } from "@/lib/metrics";
 import { getChain } from "@/lib/chains";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
+import { getSessionAddress } from "@/lib/session";
 
 // POST /api/provider/link  -> attach a network address to an existing, already-claimed listing.
 //
@@ -64,13 +65,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Find the target listing by name, and require it to already be claimed (have a verified owner).
-  // Only a claimed listing can have networks added; the first claim is done via /submit.
-  const norm = (s: string) => s.trim().toLowerCase();
+  // The CALLER must already own the target listing. Linking attaches B with one signature from B, so
+  // without this check anyone controlling a registered address could attach themselves (verified +
+  // listed) to ANY listing by name (S1: listing takeover). We require an authenticated session whose
+  // address is a verified owner of the target, i.e. the caller previously claimed/signed in to it.
+  const sessionAddr = (await getSessionAddress())?.toLowerCase() ?? null;
+  if (!sessionAddr) {
+    return NextResponse.json(
+      { error: "sign in to the listing you want to add a network to before linking" },
+      { status: 401 }
+    );
+  }
+
+  // Find the target listing by name. Match BY NAME using the shared normaliser (S14: same rule the
+  // create path uses), require it to already be claimed, AND require the session to be one of its
+  // verified owners.
+  const { normalizeName } = await import("@/lib/validation");
   const candidates = await prisma.provider.findMany({
-    select: { id: true, name: true, addresses: { select: { verified: true } } },
+    select: { id: true, name: true, addresses: { select: { address: true, verified: true } } },
   });
-  const ownedA = candidates.find((p) => norm(p.name) === norm(name));
+  const ownedA = candidates.find((p) => normalizeName(p.name) === normalizeName(name));
   if (!ownedA) {
     return NextResponse.json(
       { error: `no listing named "${name}" exists. Create one first via List your provider.` },
@@ -83,6 +97,15 @@ export async function POST(req: NextRequest) {
         error: `the listing "${ownedA.name}" has no verified owner yet. Claim it first via List your provider.`,
       },
       { status: 409 }
+    );
+  }
+  const callerOwnsTarget = ownedA.addresses.some(
+    (a) => a.verified && a.address.toLowerCase() === sessionAddr
+  );
+  if (!callerOwnsTarget) {
+    return NextResponse.json(
+      { error: "you are not a verified owner of this listing; sign in with an address already on it" },
+      { status: 403 }
     );
   }
 

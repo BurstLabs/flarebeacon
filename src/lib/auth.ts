@@ -18,20 +18,26 @@ const SIWE_URI = process.env.SIWE_URI ?? "http://localhost:3000";
  */
 export async function issueChallenge(
   address: string,
-  chainId: number
+  chainId: number,
+  action?: string
 ): Promise<string> {
   const nonce = randomBytes(16).toString("hex");
   const expiresAt = new Date(Date.now() + CHALLENGE_TTL_MS);
 
+  // Bind the challenge to the chain and (optionally) the intended action, both checked at verify time
+  // so a signature gathered for one purpose can't be spent on another (S5/S6).
   await prisma.authChallenge.create({
-    data: { address: address.toLowerCase(), nonce, expiresAt },
+    data: { address: address.toLowerCase(), nonce, chainId, action: action ?? null, expiresAt },
   });
+
+  const statement = action
+    ? `Flare Registry: authorize "${action}" with this address.`
+    : "Sign in to Flare Registry to prove you control this signal-provider address.";
 
   const message = new SiweMessage({
     domain: SIWE_DOMAIN,
     address, // checksummed; SIWE requires EIP-55 here
-    statement:
-      "Sign in to Flare Registry to prove you control this signal-provider address.",
+    statement,
     uri: SIWE_URI,
     version: "1",
     chainId,
@@ -54,7 +60,8 @@ export interface VerifyResult {
  */
 export async function verifyChallenge(
   message: string,
-  signature: string
+  signature: string,
+  expectedAction?: string
 ): Promise<VerifyResult> {
   let siwe: SiweMessage;
   try {
@@ -63,6 +70,11 @@ export async function verifyChallenge(
     return { ok: false, error: "malformed message" };
   }
 
+  // Pin the domain on BOTH the EOA and the EIP-1271 path (S6). siwe.verify also checks domain on the
+  // EOA branch, but the contract-signature fallback below only checks the raw signature, so without
+  // this an out-of-domain message could pass on that branch.
+  if (siwe.domain !== SIWE_DOMAIN) return { ok: false, error: "wrong domain" };
+
   const challenge = await prisma.authChallenge.findUnique({
     where: { nonce: siwe.nonce },
   });
@@ -70,6 +82,15 @@ export async function verifyChallenge(
   if (challenge.consumed) return { ok: false, error: "nonce already used" };
   if (challenge.expiresAt.getTime() < Date.now())
     return { ok: false, error: "challenge expired" };
+
+  // The message must be on the same chain the challenge was issued for (S6). Older challenges issued
+  // before this column existed have chainId null; for those, skip the check (back-compat).
+  if (challenge.chainId != null && siwe.chainId !== challenge.chainId)
+    return { ok: false, error: "wrong chain" };
+
+  // If the caller requires a specific action, the challenge must have been issued for it (S5).
+  if (expectedAction && challenge.action !== expectedAction)
+    return { ok: false, error: "challenge not authorized for this action" };
 
   // siwe.verify checks the signature recovers to siwe.address (EOA / ECDSA) and that nonce/domain
   // match. It does NOT validate smart-account (EIP-1271) signatures unless given an ethers provider,

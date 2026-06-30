@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 // PATCH /api/admin/address  { id, verified?, listed? }  -> override a ProviderAddress's flags.
 export async function PATCH(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireAdmin(req);
   if (denied) return denied;
   const b = await req.json().catch(() => null);
   const id = typeof b?.id === "string" ? b.id : null;
@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/admin/address  { id }  -> remove a ProviderAddress (refuses the last one on a provider).
 export async function DELETE(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireAdmin(req);
   if (denied) return denied;
   const b = await req.json().catch(() => null);
   const id = typeof b?.id === "string" ? b.id : null;

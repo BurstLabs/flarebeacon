@@ -109,10 +109,16 @@ export async function loadMembers(): Promise<{
     voterByAddress.set(v, v);
   }
 
+  // The GOVERNANCE_TEST_* knobs below can inject members and shrink the quorum denominator (down to a
+  // single vote), so they are a governance-takeover lever if ever set by accident. They are honored
+  // ONLY when the explicit master switch GOVERNANCE_TEST_MODE=1 is set (S10); any of the individual
+  // vars on their own do nothing. Set the switch deliberately for a sim, and unset it after teardown.
+  const testMode = process.env.GOVERNANCE_TEST_MODE === "1";
+
   // Test-only: GOVERNANCE_TEST_MEMBERS (comma-separated lowercased addresses) are treated as
   // additional members so an end-to-end test can sign with controllable keys. Unset in normal
   // operation; each test address counts as its own distinct member entity.
-  const testMembers = (process.env.GOVERNANCE_TEST_MEMBERS ?? "")
+  const testMembers = (testMode ? process.env.GOVERNANCE_TEST_MEMBERS ?? "" : "")
     .split(",")
     .map((a) => a.trim().toLowerCase())
     .filter(Boolean);
@@ -122,7 +128,9 @@ export async function loadMembers(): Promise<{
   }
   // Test-only: override the effective member count so an end-to-end test can reach the turnout
   // floor with a handful of votes. Unset in normal operation.
-  const countOverride = Number(process.env.GOVERNANCE_TEST_MEMBER_COUNT_OVERRIDE ?? "");
+  const countOverride = testMode
+    ? Number(process.env.GOVERNANCE_TEST_MEMBER_COUNT_OVERRIDE ?? "")
+    : NaN;
   const totalMemberCount =
     Number.isFinite(countOverride) && countOverride > 0
       ? countOverride
@@ -146,7 +154,7 @@ export async function loadMembers(): Promise<{
   // members entirely, so an address that is BOTH an on-chain member and the flagged provider can be
   // tested in the provider role (otherwise the member branch wins). Applied last so it strips the
   // voter and all of its role addresses regardless of insertion order. Unset in normal operation.
-  const excluded = (process.env.GOVERNANCE_TEST_EXCLUDE ?? "")
+  const excluded = (testMode ? process.env.GOVERNANCE_TEST_EXCLUDE ?? "" : "")
     .split(",")
     .map((a) => a.trim().toLowerCase())
     .filter(Boolean);
@@ -307,4 +315,33 @@ export async function governanceByProvider(): Promise<Map<string, ProviderGovern
     }
   }
   return map;
+}
+
+/**
+ * True if a reply target ref ("<type>:<id>") refers to a row that belongs to the given case.
+ * Used to validate `replyToRef` so a reply/entry can't point at another case's content (S18).
+ */
+export async function targetBelongsToCase(
+  refType: string,
+  refId: string,
+  caseId: string
+): Promise<boolean> {
+  if (!refType || !refId) return false;
+  if (refType === "initiation") {
+    return !!(await prisma.providerFlagInitiation.findFirst({ where: { id: refId, caseId } }));
+  }
+  if (refType === "groundsEntry") {
+    return !!(await prisma.providerFlagGroundsEntry.findFirst({
+      where: { id: refId, initiation: { caseId } },
+    }));
+  }
+  if (refType === "defense") {
+    return !!(await prisma.providerFlagDefense.findFirst({ where: { id: refId, caseId } }));
+  }
+  if (refType === "defenseEntry") {
+    return !!(await prisma.providerFlagDefenseEntry.findFirst({
+      where: { id: refId, defense: { caseId } },
+    }));
+  }
+  return false;
 }

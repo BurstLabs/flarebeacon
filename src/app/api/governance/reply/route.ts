@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyChallenge } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isClean } from "@/lib/content-filter";
-import { loadMembers, memberVoterFor } from "@/lib/governance";
+import { loadMembers, memberVoterFor, targetBelongsToCase } from "@/lib/governance";
 import { imageBuffersFromForm, storePointImageBatch } from "@/lib/point-image";
 import { randomUUID } from "crypto";
 import { apiError } from "@/lib/api-error";
@@ -68,6 +68,9 @@ export async function POST(req: NextRequest) {
   }
   if (!isClean(text)) {
     return apiError("INAPPROPRIATE_LANGUAGE", "reply contains inappropriate language", 400);
+  }
+  if (title && !isClean(title)) {
+    return apiError("INAPPROPRIATE_LANGUAGE", "title contains inappropriate language", 400);
   }
 
   const verified = await verifyChallenge(message, signature);
@@ -188,23 +191,3 @@ async function attachImages(
 }
 
 // Confirm the reply target (by ownerType:ownerId) is a point on this case.
-async function targetBelongsToCase(refType: string, refId: string, caseId: string): Promise<boolean> {
-  if (!refType || !refId) return false;
-  if (refType === "initiation") {
-    return !!(await prisma.providerFlagInitiation.findFirst({ where: { id: refId, caseId } }));
-  }
-  if (refType === "groundsEntry") {
-    return !!(await prisma.providerFlagGroundsEntry.findFirst({
-      where: { id: refId, initiation: { caseId } },
-    }));
-  }
-  if (refType === "defense") {
-    return !!(await prisma.providerFlagDefense.findFirst({ where: { id: refId, caseId } }));
-  }
-  if (refType === "defenseEntry") {
-    return !!(await prisma.providerFlagDefenseEntry.findFirst({
-      where: { id: refId, defense: { caseId } },
-    }));
-  }
-  return false;
-}

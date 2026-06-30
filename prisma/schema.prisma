@@ -92,6 +92,8 @@ model AuthChallenge {
   id        String   @id @default(cuid())
   address   String // lowercased claimed address
   nonce     String   @unique
+  chainId   Int? // chain the challenge was issued for; pinned at verify time (S5/S6)
+  action    String? // optional bound action (e.g. "vote", "flag"); checked at verify time (S5)
   expiresAt DateTime
   consumed  Boolean  @default(false)
   createdAt DateTime @default(now())

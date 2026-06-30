@@ -22,15 +22,31 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Known top-level routes we count. Anything else is bucketed to "/other" so an attacker can't mint
+// unbounded distinct rows by posting arbitrary path strings (S17).
+const KNOWN_PATHS = new Set([
+  "/",
+  "/submit",
+  "/governance",
+  "/api",
+  "/about",
+  "/faq",
+  "/terms",
+  "/privacy",
+  "/provider/[address]",
+  "/governance/[id]",
+]);
+
 // Normalize a pathname to a low-cardinality key: collapse dynamic segments so /provider/0xabc and
-// /governance/<id> aggregate rather than exploding the table.
+// /governance/<id> aggregate rather than exploding the table, then allowlist the result.
 function normalizePath(raw: string): string {
   let p = (raw || "/").split("?")[0].split("#")[0];
   if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
   p = p.replace(/^\/provider\/[^/]+/, "/provider/[address]");
   p = p.replace(/^\/governance\/[^/]+/, "/governance/[id]");
   if (p.length > 80) p = p.slice(0, 80);
-  return p || "/";
+  p = p || "/";
+  return KNOWN_PATHS.has(p) ? p : "/other";
 }
 
 export async function POST(req: NextRequest) {

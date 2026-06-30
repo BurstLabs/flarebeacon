@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 // PATCH /api/admin/providers  { id, name?, description?, url?, source?, suspended? }
 // Edit core provider fields. source toggles submitted/imported (owner-verified badge + feed treatment).
 export async function PATCH(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireAdmin(req);
   if (denied) return denied;
   const b = await req.json().catch(() => null);
   const id = typeof b?.id === "string" ? b.id : null;
@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest) {
 
 // DELETE /api/admin/providers  { id }  -> delete a provider (cascades addresses + governance cases).
 export async function DELETE(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireAdmin(req);
   if (denied) return denied;
   const b = await req.json().catch(() => null);
   const id = typeof b?.id === "string" ? b.id : null;

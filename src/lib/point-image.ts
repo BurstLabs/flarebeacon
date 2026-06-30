@@ -123,30 +123,40 @@ export async function storePointImageBatch(opts: {
 }): Promise<number> {
   const { prisma, randomUUID, caseId, ownerColumn, ownerId, signerAddress, files } = opts;
   if (files.length === 0) return 0;
-  // Respect the per-point cap (a fresh point starts at 0, but guard anyway).
-  const existing = await prisma.providerFlagPointImage.count({
-    where: { [ownerColumn]: ownerId, removedAt: null },
-  });
-  const room = Math.max(0, IMAGE_MAX_PER_POINT - existing);
-  let saved = 0;
-  for (const buf of files.slice(0, room)) {
+  // Decode/validate/write the files first (outside the DB transaction, since these touch the
+  // filesystem). The per-point cap is then enforced atomically below.
+  const prepared: { id: string; stored: Awaited<ReturnType<typeof storePointImage>> }[] = [];
+  for (const buf of files.slice(0, IMAGE_MAX_PER_POINT)) {
     const id = randomUUID();
     const stored = await storePointImage(caseId, id, buf); // validates + strips EXIF + writes
-    await prisma.providerFlagPointImage.create({
-      data: {
-        id,
-        caseId,
-        [ownerColumn]: ownerId,
-        mime: stored.mime,
-        ext: stored.ext,
-        width: stored.width,
-        height: stored.height,
-        bytes: stored.bytes,
-        signerAddress,
-      },
-    });
-    saved++;
+    prepared.push({ id, stored });
   }
+  // Insert inside a transaction that RE-COUNTS, so two concurrent uploads can't both observe room and
+  // collectively exceed IMAGE_MAX_PER_POINT (S19).
+  const saved = await prisma.$transaction(async (tx: typeof prisma) => {
+    const existing = await tx.providerFlagPointImage.count({
+      where: { [ownerColumn]: ownerId, removedAt: null },
+    });
+    const room = Math.max(0, IMAGE_MAX_PER_POINT - existing);
+    let n = 0;
+    for (const { id, stored } of prepared.slice(0, room)) {
+      await tx.providerFlagPointImage.create({
+        data: {
+          id,
+          caseId,
+          [ownerColumn]: ownerId,
+          mime: stored.mime,
+          ext: stored.ext,
+          width: stored.width,
+          height: stored.height,
+          bytes: stored.bytes,
+          signerAddress,
+        },
+      });
+      n++;
+    }
+    return n;
+  });
   return saved;
 }
 

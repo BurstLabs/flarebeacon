@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
   if (!isClean(grounds)) {
     return apiError("INAPPROPRIATE_LANGUAGE", "grounds contain inappropriate language", 400);
   }
+  if (title && !isClean(title)) {
+    return apiError("INAPPROPRIATE_LANGUAGE", "title contains inappropriate language", 400);
+  }
 
   // Verify the signer controls a current Management Group member address.
   const verified = await verifyChallenge(message, signature);

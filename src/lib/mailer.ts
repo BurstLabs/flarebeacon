@@ -35,13 +35,20 @@ export interface ContactMessage {
   message: string;
 }
 
+// Strip CR/LF and address-delimiter characters from a user-supplied display name so it can't break
+// out of a header value or spoof the From/reply-To structure (S8).
+function safeName(name: string): string {
+  return name.replace(/[\r\n<>"]/g, " ").trim().slice(0, 80);
+}
+
 /** Sends a contact-form submission to the hidden support address. Throws on failure. */
 export async function sendContactEmail(m: ContactMessage): Promise<void> {
   if (!mailerConfigured()) {
     throw new Error("mailer not configured");
   }
+  const name = safeName(m.name);
   const text = [
-    `From: ${m.name} <${m.email}>`,
+    `From: ${name} <${m.email}>`,
     `Subject: ${m.subject}`,
     "",
     m.message,
@@ -49,8 +56,9 @@ export async function sendContactEmail(m: ContactMessage): Promise<void> {
 
   await getTransport().sendMail({
     from: SMTP_FROM,
+    // Structured reply-to so nodemailer encodes/escapes the display name instead of us hand-building it.
     to: CONTACT_TO,
-    replyTo: `${m.name} <${m.email}>`,
+    replyTo: { name, address: m.email },
     subject: `[Flare Registry contact] ${m.subject}`,
     text,
   });

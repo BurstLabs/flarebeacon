@@ -2,7 +2,9 @@
 
 import { useApp } from "@/components/providers";
 
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL ?? "https://flareregistry.com";
+// This is a client component, so a non-NEXT_PUBLIC_ env var would be undefined in the browser; the
+// canonical base URL is a constant here (S20).
+const PUBLIC_BASE_URL = "https://flareregistry.com";
 const ASSETS_FEED =
   "https://raw.githubusercontent.com/BurstLabs/flareregistry/main/providerlist.json";
 

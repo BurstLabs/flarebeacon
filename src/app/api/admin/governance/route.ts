@@ -33,7 +33,7 @@ export async function GET() {
 
 // DELETE /api/admin/governance  { id }  -> delete a governance case (cascades its content).
 export async function DELETE(req: NextRequest) {
-  const denied = await requireAdmin();
+  const denied = await requireAdmin(req);
   if (denied) return denied;
   const b = await req.json().catch(() => null);
   const id = typeof b?.id === "string" ? b.id : null;

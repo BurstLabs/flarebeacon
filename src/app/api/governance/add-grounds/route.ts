@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { verifyChallenge } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { isClean } from "@/lib/content-filter";
-import { loadMembers, memberVoterFor } from "@/lib/governance";
+import { loadMembers, memberVoterFor, targetBelongsToCase } from "@/lib/governance";
 import { imageBuffersFromForm, storePointImageBatch } from "@/lib/point-image";
 import { randomUUID } from "crypto";
 import { apiError } from "@/lib/api-error";
@@ -87,6 +87,13 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+  // If this entry replies to something, that target must belong to THIS case (S18: no cross-case ref).
+  if (replyToRef) {
+    const [refType, refId] = replyToRef.split(":");
+    if (!(await targetBelongsToCase(refType, refId, caseId))) {
+      return NextResponse.json({ error: "invalid reply target" }, { status: 400 });
+    }
+  }
   if (grounds.length < 10 || grounds.length > 2000) {
     return apiError(
       "GROUNDS_LENGTH",
@@ -96,6 +103,9 @@ export async function POST(req: NextRequest) {
   }
   if (!isClean(grounds)) {
     return apiError("INAPPROPRIATE_LANGUAGE", "grounds contain inappropriate language", 400);
+  }
+  if (title && !isClean(title)) {
+    return apiError("INAPPROPRIATE_LANGUAGE", "title contains inappropriate language", 400);
   }
 
   const verified = await verifyChallenge(message, signature);
