@@ -120,10 +120,12 @@ export default function GovernancePage() {
           })}
         </p>
         <p>{t("gov.docs.s3.body2", { discussion: DISCUSSION_DAYS })}</p>
+        <p>{t("gov.docs.s3.body3")}</p>
       </Section>
 
       <Section title={t("gov.docs.s4.title")}>
         <p>{t("gov.docs.s4.body1", { turnoutPct, denyPct })}</p>
+        <p>{t("gov.docs.s4.body3")}</p>
         <p>{t("gov.docs.s4.body2")}</p>
       </Section>
 
