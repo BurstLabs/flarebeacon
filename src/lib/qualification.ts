@@ -65,8 +65,11 @@ export async function qualifyProvider(opts: {
 }): Promise<Qualification> {
   const addrs = opts.addresses.map((a) => a.toLowerCase());
 
-  // Match to the on-chain entity (any of its 5 addresses).
-  const entity = await prisma.providerOnchain.findFirst({
+  // Match to the on-chain entity (any of its 5 addresses). A provider may be a registered entity on
+  // BOTH Flare and Songbird, so match ALL of them and pick the network whose checklist QUALIFIES (or
+  // the best one if none qualify), instead of an arbitrary findFirst that could show one network's
+  // failing checks while the other network qualifies.
+  const matchedEntities = await prisma.providerOnchain.findMany({
     where: {
       OR: [
         { voter: { in: addrs } },
@@ -77,6 +80,7 @@ export async function qualifyProvider(opts: {
       ],
     },
   });
+  const entity = matchedEntities[0] ?? null;
 
   // Address-on-website is required only for genuinely NEW providers. "Established" is based on
   // ON-CHAIN TENURE (how long the entity has existed in the reward data), not when they claimed
@@ -144,81 +148,89 @@ export async function qualifyProvider(opts: {
     };
   }
 
-  const { network, voter } = entity;
+  // Evaluate the on-chain criteria for ONE matched entity (network + voter).
+  async function evaluateEntity(network: string, voter: string): Promise<Qualification> {
+    // Recent epochs for this network and this voter.
+    const epochs = await prisma.providerMetricEpoch.findMany({
+      where: { network },
+      distinct: ["epochId"],
+      orderBy: { epochId: "desc" },
+      take: UPTIME_WINDOW_EPOCHS,
+      select: { epochId: true },
+    });
+    const windowEpochIds = epochs.map((e) => e.epochId);
+    const latestEpochId = windowEpochIds[0];
 
-  // Recent epochs for this network and this voter.
-  const epochs = await prisma.providerMetricEpoch.findMany({
-    where: { network },
-    distinct: ["epochId"],
-    orderBy: { epochId: "desc" },
-    take: UPTIME_WINDOW_EPOCHS,
-    select: { epochId: true },
-  });
-  const windowEpochIds = epochs.map((e) => e.epochId);
-  const latestEpochId = windowEpochIds[0];
+    const mine = await prisma.providerMetricEpoch.findMany({
+      where: { network, voter, epochId: { in: windowEpochIds } },
+    });
+    const latest = mine.find((m) => m.epochId === latestEpochId);
 
-  const mine = await prisma.providerMetricEpoch.findMany({
-    where: { network, voter, epochId: { in: windowEpochIds } },
-  });
-  const latest = mine.find((m) => m.epochId === latestEpochId);
+    // 1) Submitting prices: present in the latest epoch with a signing weight (i.e. in the
+    //    signing policy and participating), or earning rewards.
+    const submitting =
+      latest && (latest.signingWeight != null || BigInt(latest.feeReward ?? "0") > 0n)
+        ? pass("submitting", "Submitting prices", `Active in epoch ${latestEpochId}.`)
+        : fail("submitting", "Submitting prices", "Not active in the latest reward epoch.");
 
-  // 1) Submitting prices: present in the latest epoch with a signing weight (i.e. in the
-  //    signing policy and participating), or earning rewards.
-  const submitting =
-    latest && (latest.signingWeight != null || BigInt(latest.feeReward ?? "0") > 0n)
-      ? pass("submitting", "Submitting prices", `Active in epoch ${latestEpochId}.`)
-      : fail("submitting", "Submitting prices", "Not active in the latest reward epoch.");
+    // 2) Sufficient vote power: registered with non-zero wNat weight and present in the signing
+    //    policy (signing weight set) for the latest epoch.
+    const hasVotePower =
+      latest != null &&
+      latest.wNatWeight != null &&
+      BigInt(latest.wNatWeight) > 0n &&
+      latest.signingWeight != null;
+    const votepower = hasVotePower
+      ? pass("votepower", "Sufficient vote power", "Enough vote power to participate.")
+      : fail("votepower", "Sufficient vote power", "Below the participation threshold.");
 
-  // 2) Sufficient vote power: registered with non-zero wNat weight and present in the signing
-  //    policy (signing weight set) for the latest epoch.
-  const hasVotePower =
-    latest != null &&
-    latest.wNatWeight != null &&
-    BigInt(latest.wNatWeight) > 0n &&
-    latest.signingWeight != null;
-  const votepower = hasVotePower
-    ? pass("votepower", "Sufficient vote power", "Enough vote power to participate.")
-    : fail("votepower", "Sufficient vote power", "Below the participation threshold.");
+    // 3) ≥95% uptime over 30 days: present in >=95% of the last ~9 epochs. Honest "unknown" when
+    //    there is not yet enough history.
+    let uptime: Check;
+    if (windowEpochIds.length < UPTIME_WINDOW_EPOCHS) {
+      uptime = unknown(
+        "uptime",
+        "Uptime (last 9 epochs)",
+        `Insufficient history (${windowEpochIds.length}/${UPTIME_WINDOW_EPOCHS} epochs).`
+      );
+    } else {
+      const presentCount = mine.length;
+      const ratio = presentCount / windowEpochIds.length;
+      const needed = Math.ceil(UPTIME_THRESHOLD * windowEpochIds.length);
+      const present = `Present in ${presentCount} of ${windowEpochIds.length} epochs.`;
+      uptime =
+        ratio >= UPTIME_THRESHOLD
+          ? pass("uptime", "Uptime (last 9 epochs)", present)
+          : fail(
+              "uptime",
+              "Uptime (last 9 epochs)",
+              `${present} Needs at least ${needed} of ${windowEpochIds.length}.`
+            );
+    }
 
-  // 3) ≥95% uptime over 30 days: present in >=95% of the last ~9 epochs. Honest "unknown" when
-  //    there is not yet enough history.
-  let uptime: Check;
-  if (windowEpochIds.length < UPTIME_WINDOW_EPOCHS) {
-    uptime = unknown(
-      "uptime",
-      "Uptime (last 9 epochs)",
-      `Insufficient history (${windowEpochIds.length}/${UPTIME_WINDOW_EPOCHS} epochs).`
+    // 4) One provider per network: this team has a single registered entity on this network.
+    const oneper = pass(
+      "oneper",
+      "One provider per network",
+      "Single registered entity matched on this network."
     );
-  } else {
-    const presentCount = mine.length;
-    const ratio = presentCount / windowEpochIds.length;
-    // Minimum present epochs to pass (>=95% of the window), and the implied max misses allowed.
-    const needed = Math.ceil(UPTIME_THRESHOLD * windowEpochIds.length);
-    const present = `Present in ${presentCount} of ${windowEpochIds.length} epochs.`;
-    uptime =
-      ratio >= UPTIME_THRESHOLD
-        ? pass("uptime", "Uptime (last 9 epochs)", present)
-        : fail(
-            "uptime",
-            "Uptime (last 9 epochs)",
-            `${present} Needs at least ${needed} of ${windowEpochIds.length}.`
-          );
+
+    const checks = [websiteCheck, submitting, votepower, uptime, oneper];
+    const qualified = checks.every((c) => c.status === "pass");
+    return { network, voter, qualified, checks };
   }
 
-  // 4) One provider per network: this team has a single registered entity on this network. We
-  //    match a listing to exactly one entity, so this passes when matched (a stronger,
-  //    multi-entity-per-team check would need cross-entity ownership data we don't have).
-  const oneper = pass(
-    "oneper",
-    "One provider per network",
-    "Single registered entity matched on this network."
+  // Evaluate every matched entity (one per network the provider is registered on) and return the
+  // network whose checklist QUALIFIES; if none qualify, return the "best" (fewest failing checks) so
+  // the displayed checklist reflects the provider's strongest network, not an arbitrary one.
+  const results = await Promise.all(
+    matchedEntities.map((e) => evaluateEntity(e.network, e.voter))
   );
-
-  const checks = [websiteCheck, submitting, votepower, uptime, oneper];
-  // Qualified = all checks pass. Unknowns don't qualify but aren't fails (just "not yet provable").
-  const qualified = checks.every((c) => c.status === "pass");
-
-  return { network, voter, qualified, checks };
+  const qualifyingResult = results.find((r) => r.qualified);
+  if (qualifyingResult) return qualifyingResult;
+  const failCount = (r: Qualification) => r.checks.filter((c) => c.status === "fail").length;
+  results.sort((a, b) => failCount(a) - failCount(b));
+  return results[0];
 }
 
 /**

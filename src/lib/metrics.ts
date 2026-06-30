@@ -53,7 +53,10 @@ async function entityForAddresses(addresses: string[]): Promise<ProviderMetrics 
   if (!addresses.length) return null;
   const addrs = addresses.map((a) => a.toLowerCase());
 
-  const oc = await prisma.providerOnchain.findFirst({
+  // A provider may be a registered entity on BOTH Flare and Songbird. Match all of them and pick
+  // DETERMINISTICALLY: prefer the most recently active network (highest lastEpochSeen), tie-broken by
+  // network name. (findFirst alone returned an arbitrary, non-deterministic network.)
+  const matches = await prisma.providerOnchain.findMany({
     where: {
       OR: [
         { voter: { in: addrs } },
@@ -64,7 +67,11 @@ async function entityForAddresses(addresses: string[]): Promise<ProviderMetrics 
       ],
     },
   });
-  if (!oc) return null;
+  if (!matches.length) return null;
+  matches.sort(
+    (a, b) => b.lastEpochSeen - a.lastEpochSeen || a.network.localeCompare(b.network)
+  );
+  const oc = matches[0];
 
   const latest = await prisma.providerMetricEpoch.findFirst({
     where: { network: oc.network, voter: oc.voter },

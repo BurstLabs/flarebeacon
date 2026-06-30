@@ -100,6 +100,9 @@ function SubmitPageInner() {
   const [resolvingSession, setResolvingSession] = useState<boolean>(manage);
   const [address, setAddress] = useState<string>("");
   const [chainId, setChainId] = useState<number>(14);
+  // When the connected address is a role on BOTH networks, the user must pick which to register.
+  const [networkChoices, setNetworkChoices] = useState<{ chainId: number; chainName: string }[]>([]);
+  const [chosenChainId, setChosenChainId] = useState<number | null>(null);
   const [error, setError] = useState<string>("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -304,7 +307,18 @@ function SubmitPageInner() {
         const rr = await fetch(`/api/provider/resolve-role?address=${address.toLowerCase()}`);
         const rb = await rr.json().catch(() => ({}));
         if (rr.ok && Array.isArray(rb.roles) && rb.roles.length) {
-          signChainId = rb.roles[0].chainId;
+          // If this address is a role on MORE THAN ONE network, ask which to register (don't pick
+          // arbitrarily). Once the user has chosen (chosenChainId), use that.
+          const uniqueChains = Array.from(
+            new Map(rb.roles.map((r: { chainId: number; chainName: string }) => [r.chainId, r])).values()
+          ) as { chainId: number; chainName: string }[];
+          if (uniqueChains.length > 1 && chosenChainId == null) {
+            setNetworkChoices(uniqueChains);
+            setError(t("submit.err.pickNetwork"));
+            setBusy(false);
+            return;
+          }
+          signChainId = chosenChainId ?? uniqueChains[0].chainId;
           setChainId(signChainId);
           resolved = true;
         }
@@ -557,8 +571,32 @@ function SubmitPageInner() {
             />
             <span className="mt-1 block text-xs text-faint">{t("submit.identityNote")}</span>
           </label>
+          {/* Shown only when the connected address is a registered role on BOTH networks: pick which
+              one to register. */}
+          {networkChoices.length > 1 && (
+            <label className="block text-sm">
+              {t("submit.network")}
+              <select
+                className="mt-1 block w-full rounded bg-elev border border-themed px-3 py-2"
+                value={chosenChainId ?? ""}
+                onChange={(e) => {
+                  setChosenChainId(Number(e.target.value));
+                  setError("");
+                }}
+              >
+                <option value="" disabled>
+                  {t("submit.pickNetworkOption")}
+                </option>
+                {networkChoices.map((c) => (
+                  <option key={c.chainId} value={c.chainId}>
+                    {c.chainName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button
-            disabled={busy}
+            disabled={busy || (networkChoices.length > 1 && chosenChainId == null)}
             onClick={verify}
             className="rounded bg-beacon px-4 py-2 font-medium text-neutral-950 hover:opacity-90 disabled:opacity-50"
           >
