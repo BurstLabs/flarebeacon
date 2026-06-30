@@ -1,6 +1,6 @@
 {
   "name": "Flare Registry FTSO Signal Providers",
-  "timestamp": "2026-06-30T18:38:16.320Z",
+  "timestamp": "2026-06-30T18:38:40.732Z",
   "version": {
     "major": 1,
     "minor": 3,
@@ -533,6 +533,47 @@
         },
         "qualification": {
           "qualifiedSince": "2026-06-22T23:47:19.748Z",
+          "lastSubmittedEpoch": 410,
+          "epochsSinceSubmit": 0,
+          "epochsUntilRevoke": 17,
+          "revokeAfterEpochs": 17
+        }
+      }
+    },
+    {
+      "chainId": 14,
+      "name": "Burst FTSO",
+      "description": "We strive to provide the best signals possible. Decentralization is extremely important to us, with this FTSO we will be helping the Flare blockchain achieve this.",
+      "url": "https://www.burstlabs.io",
+      "address": "0x670a7Fd22cAa9C2Fb5B798078d084B29AB4bC63C",
+      "logoURI": "https://raw.githubusercontent.com/BurstLabs/flareregistry/main/assets/0x670a7Fd22cAa9C2Fb5B798078d084B29AB4bC63C.png",
+      "listed": true,
+      "flareregistry": {
+        "verified": true,
+        "registered": true,
+        "managementGroup": true,
+        "qualified": true,
+        "network": "flare",
+        "feePercent": 20,
+        "votePower": "122489750626975483233954033",
+        "votePowerCapped": "122489750626975483233954033",
+        "feedCount": 63,
+        "lastEpoch": 410,
+        "delegatorRewardLastEpoch": "63983875103584429082214",
+        "feeRewardLastEpoch": "19839366075584624787514",
+        "entity": {
+          "identity": "0x258B0352dF1D1268856f92846D223C74eB2De9d9",
+          "submit": "0x47af96571e3BEae0B9a2B9D3448AdF0301187873",
+          "submitSignatures": "0x7B876E007bc273E44D4a50a85A2C481504CED4b6",
+          "signingPolicy": "0x05f46574210074B5F5d7130FB3E0833d180693D8",
+          "delegation": "0x670a7Fd22cAa9C2Fb5B798078d084B29AB4bC63C"
+        },
+        "selfDeclared": {
+          "privateNode": true,
+          "algorithm": "in-house"
+        },
+        "qualification": {
+          "qualifiedSince": "2026-06-29T20:02:16.605Z",
           "lastSubmittedEpoch": 410,
           "epochsSinceSubmit": 0,
           "epochsUntilRevoke": 17,
@@ -3995,7 +4036,7 @@
       "flareregistry": {
         "verified": true,
         "registered": true,
-        "managementGroup": false,
+        "managementGroup": true,
         "qualified": true,
         "network": "songbird",
         "feePercent": 20,
