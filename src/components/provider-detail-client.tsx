@@ -363,9 +363,13 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
                 )}
                 <div className="truncate font-mono text-xs">{a.address}</div>
               </div>
-              {a.verified && (
+              {a.verified ? (
                 <span className="shrink-0 rounded-md bg-beacon/20 px-2 py-0.5 text-xs text-beacon">
                   {t("badge.verified")}
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-md bg-elev px-2 py-0.5 text-xs text-faint">
+                  {t("badge.unverified")}
                 </span>
               )}
             </li>
