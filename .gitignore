@@ -8,3 +8,6 @@ dist/
 .DS_Store
 /public/uploads/
 prisma/dev.db
+
+# Internal docs — not for the public repo
+docs/
