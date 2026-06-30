@@ -294,19 +294,33 @@ function SubmitPageInner() {
     setError("");
     setBusy(true);
     try {
-      // The network is determined by the connected address, not a picker: resolve which network this
-      // address is a registered entity on (Flare/Songbird) and sign on that chain. If it resolves to
-      // neither, it isn't a registered FTSO entity - tell the user before they sign.
+      // The network is determined by the connected address, not a picker. resolve-role checks BOTH
+      // Flare and Songbird and returns the network(s) this address is a registered entity on. If it
+      // resolves to neither, the address isn't a registered FTSO entity on either network - tell the
+      // user up front (before signing) rather than guessing one network.
       let signChainId = chainId;
+      let resolved = false;
       try {
         const rr = await fetch(`/api/provider/resolve-role?address=${address.toLowerCase()}`);
         const rb = await rr.json().catch(() => ({}));
         if (rr.ok && Array.isArray(rb.roles) && rb.roles.length) {
           signChainId = rb.roles[0].chainId;
           setChainId(signChainId);
+          resolved = true;
         }
       } catch {
-        /* fall back to the current chainId; the registration check below still gates */
+        /* network error resolving; treat as unresolved below */
+      }
+      // Not a registered entity on Flare or Songbird: stop here with a both-networks message. (A
+      // listing that already exists for this address - a claim/edit - is still allowed; checked after
+      // sign-in via loadExisting, so only block when there is no resolved network AND no existing row.)
+      if (!resolved) {
+        const existsRes = await fetch(`/api/provider/${address.toLowerCase()}`);
+        if (!existsRes.ok) {
+          setError(t("submit.err.notRegisteredEither", { address: address.toLowerCase() }));
+          setBusy(false);
+          return;
+        }
       }
       const { message, signature } = await connectAndSign({ chainId: signChainId });
 
@@ -319,27 +333,9 @@ function SubmitPageInner() {
         const body = await verifyRes.json().catch(() => ({}));
         throw new Error(apiErrorMessage(t, body, "submit.err.verifyFailed"));
       }
-      // Prefill from an existing listing (claiming an imported entry, or editing your own).
-      const hasExisting = await loadExisting(address.toLowerCase());
-      // For a brand-new listing on a mainnet chain, check registration UP FRONT so an unregistered
-      // address is told here instead of after filling in the whole form and clicking Publish. An
-      // existing listing (claim/edit) skips this; the server still enforces the gate on save.
-      if (!hasExisting) {
-        try {
-          const regRes = await fetch(
-            `/api/provider/registration?address=${address.toLowerCase()}&chainId=${signChainId}`
-          );
-          const reg = await regRes.json().catch(() => ({}));
-          if (regRes.ok && reg.mainnet && reg.registered === false) {
-            setError(
-              t("submit.err.notRegistered", { address: address.toLowerCase(), chain: reg.chainName })
-            );
-            return; // stay on the connect/verify step; do not advance to the form
-          }
-        } catch {
-          // Non-fatal: if the check fails, fall through; the server still gates on publish.
-        }
-      }
+      // Prefill from an existing listing (claiming an imported entry, or editing your own). Registration
+      // was already confirmed before signing (resolve-role checks both networks), so no second check.
+      await loadExisting(address.toLowerCase());
       setStep("form");
     } catch (e) {
       setError(e instanceof Error ? e.message : t("submit.err.verifyFailed"));
