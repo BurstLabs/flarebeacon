@@ -60,7 +60,7 @@ export default function AdminPage() {
     setErr("");
     setBusy(true);
     try {
-      const { message, signature } = await connectAndSign({ chainId: 14 });
+      const { message, signature } = await connectAndSign({ chainId: 14, action: "session" });
       const verifyRes = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "content-type": "application/json" },
