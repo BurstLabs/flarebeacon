@@ -43,7 +43,7 @@ export function LinkNetworkPanel({
   async function signIn() {
     // Establish a session as the connected address (must be one that owns this listing; the server
     // enforces ownership). The session challenge is on Flare (14).
-    const { message, signature } = await connectAndSign({ chainId: 14 });
+    const { message, signature } = await connectAndSign({ chainId: 14, action: "session" });
     const verifyRes = await fetch("/api/auth/verify", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -55,13 +55,24 @@ export function LinkNetworkPanel({
     }
   }
 
-  // Core flow: connect the wallet, prove ownership of the listing by signing in, then sign a
-  // challenge for `chainId` and submit it. The link endpoint upserts the address as verified, so
-  // this both LINKS a new network and VERIFIES an existing unverified row. `expectAddress`, when
-  // given (the "Verify" action on a specific row), requires the connected wallet to be that address.
-  // mode "link" = attach a NEW network address (needs an owner session first, S1). mode "verify" =
-  // prove an existing row already on the listing; the provider may sign with ANY of the entity's five
-  // on-chain role addresses (the server resolves the entity), so we do NOT pin the connected account.
+  // Submit a link/verify to the server with a fresh B-signature for `chainId`.
+  async function postLink(chainId: number): Promise<Response> {
+    const { message, signature } = await connectAndSign({ chainId, action: "link" });
+    return fetch("/api/provider/link", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message, signature, name: providerName }),
+    });
+  }
+
+  // Core flow. VERIFY an existing row needs only a single signature from the target network. LINK a
+  // NEW network additionally requires an owner session (proof you own THIS listing), so a stranger
+  // can't attach their address to it by name. The happy path is still one signature: when the
+  // provider is already managing the listing (came in via "Manage this listing"), the session exists
+  // and the first attempt succeeds. Only if the server reports the caller is not a signed-in owner do
+  // we ask them to sign in with an address already on the listing, then retry the B-signature. That
+  // keeps the two-identity requirement clear ("owner, then the new address") without a silent
+  // wallet-switch.
   async function proveAddress(chainId: number, mode: "link" | "verify" = "link") {
     setErr("");
     setMsg("");
@@ -70,16 +81,20 @@ export function LinkNetworkPanel({
     if (mode === "verify") setVerifyingKey(`${chainId}`);
     else setBusy(true);
     try {
-      // Both link and verify need a single signature from any of the target network's five role
-      // addresses; the server resolves the entity and confirms control. No owner sign-in or account
-      // pinning is required.
-      const { message, signature } = await connectAndSign({ chainId });
+      let res = await postLink(chainId);
 
-      const res = await fetch("/api/provider/link", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message, signature, name: providerName }),
-      });
+      // New-network link with no owner session: the server asks us to prove ownership first. Guide the
+      // user to sign in with an address ALREADY on the listing, then retry the new-address signature.
+      if (mode === "link" && (res.status === 401 || res.status === 403)) {
+        const body = await res.clone().json().catch(() => ({}));
+        if (body?.code === "NOT_AUTHENTICATED" || body?.code === "NOT_LISTING_OWNER") {
+          setMsg(t("submit.link.ownerStep"));
+          await signIn(); // connect a wallet holding one of the listing's addresses, sign in
+          setMsg("");
+          res = await postLink(chainId); // now sign for the NEW address and link
+        }
+      }
+
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(apiErrorMessage(t, body, "submit.err.linkFailed"));

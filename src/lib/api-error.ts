@@ -28,6 +28,7 @@ export type ApiErrorCode =
   | "FLAG_ALREADY_OPENED"
   // authorship / ownership
   | "NOT_PROVIDER"
+  | "NOT_LISTING_OWNER"
   | "NOT_YOUR_FLAG"
   | "NOT_CO_INITIATOR"
   | "CANNOT_REPLY_YET"
@@ -35,6 +36,7 @@ export type ApiErrorCode =
   | "PROVIDER_NEEDS_RESPONSE"
   // listing
   | "LOGO_REQUIRED"
+  | "LOGO_URI_INVALID"
   | "NOT_REGISTERED"
   | "NAME_TAKEN"
   | "ADDRESS_OTHER_LISTING"
@@ -59,12 +61,14 @@ export const API_ERROR_I18N: Record<ApiErrorCode, string> = {
   VOTING_NOT_OPEN: "apiErr.votingNotOpen",
   FLAG_ALREADY_OPENED: "apiErr.flagAlreadyOpened",
   NOT_PROVIDER: "apiErr.notProvider",
+  NOT_LISTING_OWNER: "apiErr.notListingOwner",
   NOT_YOUR_FLAG: "apiErr.notYourFlag",
   NOT_CO_INITIATOR: "apiErr.notCoInitiator",
   CANNOT_REPLY_YET: "apiErr.cannotReplyYet",
   CANNOT_ADD_GROUNDS_YET: "apiErr.cannotAddGroundsYet",
   PROVIDER_NEEDS_RESPONSE: "apiErr.providerNeedsResponse",
   LOGO_REQUIRED: "apiErr.logoRequired",
+  LOGO_URI_INVALID: "apiErr.logoUriInvalid",
   NOT_REGISTERED: "apiErr.notRegistered",
   NAME_TAKEN: "apiErr.nameTaken",
   ADDRESS_OTHER_LISTING: "apiErr.addressOtherListing",

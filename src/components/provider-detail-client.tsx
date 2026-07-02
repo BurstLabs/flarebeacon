@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useApp } from "./providers";
+import { safeExternalUrl } from "@/lib/validation";
 import { FlagAction, ReportLogoAction } from "./governance-actions";
 import { LinkNetworkPanel } from "./link-network-panel";
 import { ManageListingButton } from "./manage-listing-button";
@@ -212,7 +213,7 @@ export function ProviderDetailClient({ data: d }: { data: DetailData }) {
 
       <p className="mt-4 text-muted">{d.description}</p>
       <a
-        href={d.url}
+        href={safeExternalUrl(d.url)}
         target="_blank"
         rel="noreferrer"
         className="mt-2 inline-block break-all text-sm text-beacon hover:underline"

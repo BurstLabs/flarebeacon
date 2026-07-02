@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify the signer controls a current Management Group member address.
-  const verified = await verifyChallenge(message, signature);
+  const verified = await verifyChallenge(message, signature, "governance");
   if (!verified.ok || !verified.address) {
     return NextResponse.json({ error: verified.error ?? "bad signature" }, { status: 401 });
   }

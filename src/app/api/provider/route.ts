@@ -6,6 +6,7 @@ import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
 import { isRegisteredOnchain, resolveEntityListingAddress, entityRoleAddresses } from "@/lib/metrics";
 import { getChain } from "@/lib/chains";
+import { isAssetLogoURI } from "@/lib/logos";
 import { apiError } from "@/lib/api-error";
 
 // POST /api/provider  -> create or update the authenticated provider's listing.
@@ -26,6 +27,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
   const input = parsed.data;
+
+  // A logoURI is only trusted if it points at our own assets repo, i.e. it came from an actual
+  // upload through /api/provider/logo (which validates the PNG and stages it for review). Reject an
+  // arbitrary host so a caller cannot set a live logo that skips PNG validation and the review window.
+  if (input.logoURI && !isAssetLogoURI(input.logoURI)) {
+    return apiError("LOGO_URI_INVALID", "logoURI must be an uploaded asset URL", 400);
+  }
 
   // The caller proves control of a network by signing with ANY of that network entity's five on-chain
   // role addresses, not only the address stored on the listing. So, per submitted address, normalize it

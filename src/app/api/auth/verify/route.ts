@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "bad request" }, { status: 400 });
   }
-  const result = await verifyChallenge(parsed.data.message, parsed.data.signature);
+  const result = await verifyChallenge(parsed.data.message, parsed.data.signature, "session");
   if (!result.ok || !result.address) {
     return NextResponse.json({ error: result.error ?? "verification failed" }, { status: 401 });
   }

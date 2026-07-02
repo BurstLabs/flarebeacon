@@ -5,8 +5,23 @@
 // (e.g. "f.u.c.k", "f u c k", "fuuuck"). We collapse to a comparable alphabetic form.
 function normalize(input: string): string {
   return input
+    // NFKC folds compatibility forms to their canonical ASCII: fullwidth "ｆｕｃｋ", math-bold
+    // "𝐟𝐮𝐜𝐤", circled/parenthesized letters, etc. all collapse to "fuck". Do this FIRST so the
+    // evasion is gone before any other pass. Without it, `[^a-z]+ -> space` silently ate these
+    // characters and the term slipped through clean.
+    .normalize("NFKC")
     .toLowerCase()
-    .replace(/[Ѐ-ӿ]/g, "") // drop cyrillic look-alikes rather than mis-map
+    // Strip combining marks so accented look-alikes ("fúck", "nígger") fold to their base letter.
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    // Remove zero-width and other invisible separators that split a word ("f​uck").
+    .replace(/[​-‏‪-‮⁠﻿­]/g, "")
+    // Map the common Cyrillic homoglyphs to their Latin look-alike ("nіgger" -> "nigger") BEFORE
+    // dropping the rest, so a single swapped letter no longer smuggles a slur past the filter.
+    .replace(/а/g, "a").replace(/е/g, "e").replace(/о/g, "o").replace(/р/g, "p")
+    .replace(/с/g, "c").replace(/у/g, "y").replace(/х/g, "x").replace(/і/g, "i")
+    .replace(/ѕ/g, "s").replace(/ԁ/g, "d").replace(/һ/g, "h").replace(/ո/g, "n")
+    .replace(/[Ѐ-ӿ]/g, "") // drop any remaining cyrillic rather than mis-map
     .replace(/[@4]/g, "a")
     .replace(/[3]/g, "e")
     .replace(/[1!|]/g, "i")

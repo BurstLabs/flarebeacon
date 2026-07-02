@@ -1,22 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyChallenge } from "@/lib/auth";
-import { isRegisteredOnchain, resolveEntityListingAddress, entityRoleAddresses } from "@/lib/metrics";
+import {
+  isRegisteredOnchain,
+  resolveEntityListingAddress,
+  entityRoleAddresses,
+  listingAddressesForSigner,
+} from "@/lib/metrics";
+import { getSessionAddress } from "@/lib/session";
 import { getChain } from "@/lib/chains";
 import { publishFeedToRepo } from "@/lib/feed";
 import { rateLimit } from "@/lib/rate-limit";
 
 // POST /api/provider/link  -> attach a network address to an existing, already-claimed listing.
 //
-// Flare and Songbird addresses aren't linked on-chain, and the two addresses are usually different
-// wallets, so the owner often only has the NEW address's key on hand. We therefore authorize with a
-// SINGLE signature from the new address (B), and gate it so a listing can't be hijacked:
-//   - B's signature proves control of the new address.
-//   - The target listing is matched BY NAME and must ALREADY have a verified owner (only a claimed
-//     listing can have networks added; the first claim happens via /submit).
-//   - For mainnet, B must be an on-chain registered FTSO entity on B's chain.
-//   - B must not already be a verified part of a DIFFERENT listing.
-// This also covers verifying an existing-but-unverified row (upsert flips it to verified).
+// Two distinct operations share this route, with DIFFERENT authorization:
+//
+//   LINK a NEW network onto the listing (the address is not yet on it): requires proof of BOTH
+//     identities - an owner SESSION that belongs to the listing (proof you own it), AND a signature
+//     from the new address B (proof you control what you are adding). Without the owner-session gate,
+//     anyone controlling a registered entity on the added network could attach it to a rival's
+//     listing by name (listing contamination). The owner session is the cookie the provider already
+//     holds from claiming/managing the listing, so no live wallet switch is needed.
+//
+//   VERIFY an EXISTING row already on the listing (re-proving an address that is already attached):
+//     needs only B's signature, since the address is already part of the listing - no owner session
+//     required. This path cannot attach anything new.
+//
+// Shared gates for both: the listing is matched BY NAME and must already have a verified owner; for
+// mainnet, B must be an on-chain registered FTSO entity on B's chain; B must not already be a
+// verified part of a DIFFERENT claimed listing.
 export async function POST(req: NextRequest) {
   const limited = rateLimit(req, "submit", 10, 60_000);
   if (limited) return limited;
@@ -33,7 +46,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Address B: verify the signed challenge recovers to it (proves control of the new address).
-  const verified = await verifyChallenge(message, signature);
+  const verified = await verifyChallenge(message, signature, "link");
   if (!verified.ok || !verified.address) {
     return NextResponse.json(
       { error: verified.error ?? "could not verify the address" },
@@ -124,14 +137,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Authorization (simplified per product decision). The listing must already be claimed (checked
-  // above: it has a verified owner). To either VERIFY an existing row or LINK a new network, the signer
-  // proves control of THAT network by signing with any of its entity's five on-chain role addresses
-  // (the mainnet registration gate above already confirmed addressB is a registered entity on chain B).
-  // We do NOT additionally require a verified-owner session. Trade-off accepted: someone controlling a
-  // registered entity on the network being added could attach it to a claimed listing by name; this is
-  // a deliberate simplification to avoid the two-signature / account-switch flow.
+  // Authorization. Verifying an EXISTING row (the address is already on the listing) needs only B's
+  // signature. LINKING a NEW network requires the caller to also prove they OWN the listing, via a
+  // session that resolves to one of the listing's addresses. This closes the by-name contamination
+  // hole: controlling a registered entity on the added network is not enough to attach it to someone
+  // else's listing. Derived from state (existence of the row), not a client-supplied flag, so it
+  // cannot be bypassed by lying about the mode.
   const bAlreadyOnListing = !!existingRow;
+  if (!bAlreadyOnListing) {
+    const session = await getSessionAddress();
+    if (!session) {
+      return NextResponse.json(
+        {
+          error: "sign in with an address that already belongs to this listing before adding a network",
+          code: "NOT_AUTHENTICATED",
+        },
+        { status: 401 }
+      );
+    }
+    // The session may be a stored listing address OR any of the entity's five on-chain role addresses.
+    const ownerKeys = new Set([session.toLowerCase(), ...(await listingAddressesForSigner(session))]);
+    const sessionOwnsListing = ownedA.addresses.some((a) => ownerKeys.has(a.address.toLowerCase()));
+    if (!sessionOwnsListing) {
+      return NextResponse.json(
+        {
+          error: `you are not signed in as an owner of "${ownedA.name}". Sign in with an address already on this listing to add a network.`,
+          code: "NOT_LISTING_OWNER",
+        },
+        { status: 403 }
+      );
+    }
+  }
 
   // If the canonical listing address already belongs to a DIFFERENT provider, only allow the merge
   // when that record is an unclaimed import (no verified address). A claimed listing is never absorbed.

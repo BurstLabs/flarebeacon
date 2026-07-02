@@ -34,10 +34,35 @@ export const chainIdSchema = z
 // lowercased; at least one is required (a listing with no on-chain identity is meaningless).
 const CLEAN_MESSAGE = "contains inappropriate language; please revise";
 
+// zod's .url() accepts ANY scheme, including javascript: and data:, which render as an executable
+// href (stored XSS). Restrict provider-supplied URLs to http(s) so a malicious scheme can never be
+// stored. Used for both the website url and the logoURI.
+export function isHttpUrl(v: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(v);
+  } catch {
+    return false;
+  }
+  return u.protocol === "http:" || u.protocol === "https:";
+}
+const HTTP_URL_MESSAGE = "must be an http(s) URL";
+
+/**
+ * Render-time guard for a provider-supplied URL used as an href. Returns the URL only if it is a
+ * plain http(s) link, otherwise "#". Defense in depth: the input schema already rejects non-http
+ * schemes on write, but any legacy row stored before that guard could still hold a javascript:/data:
+ * URL that renders as an executable href (XSS). Anchors that display external URLs pass them through
+ * here first.
+ */
+export function safeExternalUrl(v: string | null | undefined): string {
+  return v && isHttpUrl(v) ? v : "#";
+}
+
 export const providerInputSchema = z.object({
   name: z.string().min(1).max(80).refine(isClean, CLEAN_MESSAGE),
   description: z.string().min(1).max(600).refine(isClean, CLEAN_MESSAGE),
-  url: z.string().url().max(200).refine(isClean, CLEAN_MESSAGE),
+  url: z.string().url().max(200).refine(isHttpUrl, HTTP_URL_MESSAGE).refine(isClean, CLEAN_MESSAGE),
   // Self-declared (provider-attested, not verifiable on-chain). Optional.
   privateNode: z.boolean().nullish(),
   algorithm: z.enum(["in-house", "open-source"]).nullish(),

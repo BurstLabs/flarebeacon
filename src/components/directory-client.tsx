@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useApp } from "./providers";
+import { safeExternalUrl } from "@/lib/validation";
 
 export interface CardCheck {
   key: string;
@@ -334,7 +335,7 @@ export function DirectoryClient({
                 )}
 
                 <a
-                  href={p.url}
+                  href={safeExternalUrl(p.url)}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-4 inline-block break-all text-sm text-beacon hover:underline"

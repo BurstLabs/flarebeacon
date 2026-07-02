@@ -43,6 +43,7 @@ export function ManageListingButton({
       // The challenge is on Flare (14). The allow-list guard runs before signing.
       const { message, signature } = await connectAndSign({
         chainId: 14,
+        action: "session",
         allowAddresses: claimed ? ownerAddresses : claimAddresses,
         allowAddressesErrorKey: claimed ? "detail.manageWrongWallet" : "detail.claimWrongWallet",
       });

@@ -336,7 +336,7 @@ function SubmitPageInner() {
           return;
         }
       }
-      const { message, signature } = await connectAndSign({ chainId: signChainId });
+      const { message, signature } = await connectAndSign({ chainId: signChainId, action: "session" });
 
       const verifyRes = await fetch("/api/auth/verify", {
         method: "POST",

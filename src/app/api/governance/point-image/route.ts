@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "image is larger than 2 MB" }, { status: 400 });
   }
 
-  const verified = await verifyChallenge(message, signature);
+  const verified = await verifyChallenge(message, signature, "governance");
   if (!verified.ok || !verified.address) {
     return NextResponse.json({ error: verified.error ?? "bad signature" }, { status: 401 });
   }

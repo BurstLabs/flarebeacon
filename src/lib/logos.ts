@@ -35,3 +35,16 @@ export function pendingLogoRawURL(address: string): string {
 export function logoRawURL(address: string): string {
   return `https://raw.githubusercontent.com/${LOGO_REPO}/${LOGO_BRANCH}/${logoRepoPath(address)}`;
 }
+
+// The raw-CDN prefix every legitimate logoURI must start with: our own assets repo/branch. A
+// provider-supplied logoURI is only trusted if it points here, so it must have come from an actual
+// upload through /api/provider/logo (which validates and commits the PNG). Without this a caller
+// could pass any host as a live logo, bypassing the PNG validation and 7-day review pipeline.
+export function assetLogoPrefix(): string {
+  return `https://raw.githubusercontent.com/${LOGO_REPO}/${LOGO_BRANCH}/${LOGO_DIR}/`;
+}
+
+/** True if a provider-supplied logoURI is one of our committed asset URLs (live or pending). */
+export function isAssetLogoURI(url: string): boolean {
+  return url.startsWith(assetLogoPrefix());
+}

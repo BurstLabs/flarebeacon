@@ -33,6 +33,10 @@ export interface ConnectAndSignOpts {
   // manage/claim wrong-wallet guard, where any of a listing's addresses is acceptable.
   allowAddresses?: string[];
   allowAddressesErrorKey?: string;
+  // Binds the resulting signature to a class of operation (see SIGN_ACTIONS in the nonce route).
+  // The matching route passes the same value as expectedAction, so a signature for one action
+  // cannot be replayed against another. Omit only for a plain sign-in.
+  action?: string;
 }
 
 // Wait for AppKit to report a connected account after opening the modal. wagmi's useAccount updates
@@ -102,7 +106,7 @@ export function useWalletSign(t: TFn) {
       const nonceRes = await fetch("/api/auth/nonce", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ address, chainId: opts.chainId }),
+        body: JSON.stringify({ address, chainId: opts.chainId, action: opts.action }),
       });
       if (!nonceRes.ok) {
         // Distinguish rate-limiting from a generic failure so the user knows to wait, not retry.
@@ -143,5 +147,7 @@ export function cleanWalletError(e: unknown, t: TFn): string {
 // hook with a one-line change.
 export function useSignChallenge(t: TFn) {
   const connectAndSign = useWalletSign(t);
-  return useCallback(() => connectAndSign({ chainId: 14 }), [connectAndSign]);
+  // All governance mutations bind to the coarse "governance" action so a plain sign-in signature
+  // cannot be replayed as a vote/flag/appeal (and vice-versa).
+  return useCallback(() => connectAndSign({ chainId: 14, action: "governance" }), [connectAndSign]);
 }
